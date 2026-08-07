@@ -1,0 +1,23 @@
+{
+  "name": "@dagnam/contracts",
+  "version": "0.1.0",
+  "description": "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dagnam-AI/dag-contracts.git",
+    "directory": "npm"
+  },
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "exports": {
+    ".": "./src/index.js",
+    "./component-schema.json": "./src/component-schema.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {}
+}

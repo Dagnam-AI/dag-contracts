@@ -1,0 +1,83 @@
+"""Serialize the canonical ``ComponentSpec`` registry to
+``component-schema.json`` and copy it byte-identically into the app trees.
+
+Run::
+
+    python -m src.validation.contracts.generate
+
+CI re-runs this and diffs the result against the committed copies
+(``info/scripts/check_contracts.py``), so a hand-edited copy or a forgotten
+regenerate fails loudly instead of silently drifting.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from src.validation.contracts._targets import render_report, write_targets
+from src.validation.contracts.components import COMPONENT_REGISTRY
+from src.validation.contracts.diagnostics import DIAGNOSTICS
+
+SCHEMA_VERSION = 3  # bumped: components now carry requires_incoming_input topology
+
+# repo root = .../mvp-backend/src/validation/contracts/generate.py -> parents[4]
+_ROOT = Path(__file__).resolve().parents[4]
+
+_CANONICAL_REL = Path("info") / "contracts" / "component-schema.json"
+_COPY_RELS = [
+    Path("mvp-frontend")
+    / "src"
+    / "features"
+    / "studio"
+    / "lib"
+    / "validation"
+    / "component-schema.json",
+    Path("dag-lib") / "dagnam" / "_contracts" / "component-schema.json",
+]
+
+
+def build_schema_payload() -> dict:
+    """Return the JSON-serializable contract.
+
+    Components are emitted in sorted ``component_id`` order so the rendered
+    JSON is byte-stable across runs (the diff guard depends on this).
+    ``exclude_none`` keeps the payload tight — optional fields only appear
+    when set.
+    """
+    components = [
+        COMPONENT_REGISTRY[cid].model_dump(exclude_none=True) for cid in sorted(COMPONENT_REGISTRY)
+    ]
+    diagnostics = [DIAGNOSTICS[code].model_dump() for code in sorted(DIAGNOSTICS)]
+    return {"version": SCHEMA_VERSION, "components": components, "diagnostics": diagnostics}
+
+
+def _serialize(payload: dict) -> str:
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def target_paths(root: Path | None = None) -> list[Path]:
+    """Canonical contract path followed by its in-repo copies."""
+    base = root or _ROOT
+    return [base / _CANONICAL_REL, *(base / rel for rel in _COPY_RELS)]
+
+
+def write_all(root: Path | None = None) -> list[Path]:
+    """Write the contract to the canonical path and every present copy.
+
+    Returns only the paths actually written: a copy in a sibling repo that is
+    not checked out is skipped rather than conjured (see ``_targets``).
+    """
+    written, _skipped = write_all_reported(root)
+    return written
+
+
+def write_all_reported(root: Path | None = None) -> tuple[list[Path], list[Path]]:
+    """``write_all`` plus the targets skipped for a missing sibling checkout."""
+    text = _serialize(build_schema_payload())
+    base = root or _ROOT
+    return write_targets(target_paths(root), text, base=base)
+
+
+if __name__ == "__main__":
+    print(render_report(*write_all_reported()))  # noqa: T201 - CLI output
