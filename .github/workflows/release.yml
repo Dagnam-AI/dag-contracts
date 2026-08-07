@@ -1,0 +1,123 @@
+name: Release dagnam-contracts
+
+# One tag publishes the contract. The tag prefix mirrors dag-lib's `dagnam/v*`
+# so a glance at a tag says which artifact it released.
+on:
+  push:
+    tags:
+      - "contracts/v*"
+
+# Guard against double-tag races (a delete + re-push of the same tag, or two
+# tags arriving together). cancel-in-progress is false on purpose: once an
+# upload starts we must let it finish, because PyPI rejects re-uploads of the
+# same version and cancelling would leave a half-released state.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build wheel and sdist
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+
+      # The distribution lives in python/, not the repo root: this repo also
+      # holds the authoring registry and the npm package, neither of which
+      # belongs in the wheel.
+      - name: Build
+        working-directory: python
+        run: uv build
+
+      # The schema IS the artifact. A wheel that builds but omits it would
+      # install cleanly and fail at first use, so assert it is inside.
+      - name: Assert the schema is in the wheel
+        working-directory: python
+        run: |
+          wheel=$(ls dist/*.whl)
+          python -m zipfile -l "$wheel" | grep -q 'dagnam_contracts/component-schema.json' \
+            || { echo "::error::component-schema.json missing from $wheel"; exit 1; }
+          echo "schema present in $wheel"
+
+      - name: Check distribution metadata
+        working-directory: python
+        run: uv run --with twine twine check dist/*
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-path: "python/dist/*"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dist
+          path: python/dist/
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/dagnam-contracts
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  smoke-testpypi:
+    name: Install from TestPyPI and validate
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.12"
+
+      # Prove the PUBLISHED artifact works, not the source tree: install it from
+      # the index and run a real validation through it. A package that imports
+      # but cannot validate is the failure this catches.
+      - name: Install and exercise the published wheel
+        run: |
+          for i in 1 2 3 4 5; do
+            pip install --index-url https://test.pypi.org/simple/ \
+                        --extra-index-url https://pypi.org/simple/ \
+                        "dagnam-contracts==${GITHUB_REF_NAME#contracts/v}" && break
+            echo "index not ready yet, retry $i"; sleep 15
+          done
+          python -c "
+          import dagnam_contracts as c
+          assert c.COMPONENT_REGISTRY, 'schema failed to load from the wheel'
+          errs = c.validate_params('convolution-layer', {'filters': -999}, node_id='n')
+          assert errs, 'published wheel validated an out-of-range value'
+          print(f'ok: {len(c.COMPONENT_REGISTRY)} components, schema v{c.SCHEMA_VERSION}')
+          "
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: smoke-testpypi
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dagnam-contracts
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
