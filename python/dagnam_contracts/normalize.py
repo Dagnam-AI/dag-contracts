@@ -14,7 +14,11 @@ from importlib import resources
 import json
 from typing import Any, cast
 
-from dagnam._types import JsonValue
+# Defined locally, not imported from the `dagnam` SDK: this package must not
+# depend on one of its own consumers, and importing it made the wheel
+# un-importable anywhere the SDK is absent -- which local testing hid,
+# because the SDK happened to be installed in the dev venv.
+JsonValue = str | int | float | bool | None | list[object] | dict[str, object]
 
 
 def _load() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
