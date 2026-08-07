@@ -1,0 +1,182 @@
+name: CI
+
+# Both distributions are built and exercised on every PR, because a release is
+# tag-triggered and both registries are immutable: a build that only breaks at
+# publish time breaks at the exact moment nothing can be taken back.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: Manifest version parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      # npm and PyPI drifted once (npm 0.1.0 against PyPI 0.1.1) because nothing
+      # tied the two manifests together and one tag ships both. Catching it here
+      # means the release workflow's identical check never has to fire.
+      - name: Assert pyproject.toml and package.json agree
+        run: |
+          py=$(grep -m1 '^version = ' python/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./npm/package.json').version")
+          echo "pyproject=$py  package.json=$js"
+          [ "$py" = "$js" ] || { echo "::error::version drift: pyproject $py vs package.json $js"; exit 1; }
+
+  python:
+    name: Python distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+
+      - name: Build
+        working-directory: python
+        run: uv build
+
+      # The schema IS the artifact: a wheel without it installs cleanly and
+      # fails at first use.
+      - name: Assert the schema is in the wheel
+        working-directory: python
+        run: |
+          wheel=$(ls dist/*.whl)
+          python -m zipfile -l "$wheel" | grep -q 'dagnam_contracts/component-schema.json' \
+            || { echo "::error::component-schema.json missing from $wheel"; exit 1; }
+
+      # v0.1.0 shipped broken because a module imported the `dagnam` SDK, which
+      # is not a dependency -- invisible in a dev environment where the SDK was
+      # already installed. A venv with ONLY the wheel is what catches that, so
+      # `--no-deps` and an empty environment are the point, not caution.
+      - name: Install the wheel alone and validate
+        working-directory: python
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet --no-deps dist/*.whl
+          /tmp/smoke/bin/python -c "
+          import dagnam_contracts as c
+          assert c.COMPONENT_REGISTRY, 'schema failed to load from the wheel'
+          errs = c.validate_params('convolution-layer', {'filters': -999}, node_id='n')
+          assert errs, 'wheel validated an out-of-range value'
+          print(f'ok: {len(c.COMPONENT_REGISTRY)} components, schema v{c.SCHEMA_VERSION}')
+          "
+
+  npm:
+    name: npm distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      # `npm run build` is `tsc && cp`, so this type-checks as well as emits.
+      - name: Build
+        working-directory: npm
+        run: npm ci && npm run build
+
+      - name: Pack, install in isolation, and validate
+        working-directory: npm
+        run: |
+          tarball="$PWD/$(npm pack --silent)"
+          tar -tzf "$tarball" | grep -q 'package/dist/component-schema.json' \
+            || { echo "::error::component-schema.json missing from the tarball"; exit 1; }
+
+          cd "$(mktemp -d)"
+          npm init -y >/dev/null
+          npm install "$tarball" >/dev/null
+          cat > smoke.mjs <<'EOF'
+          import {
+            COMPONENT_REGISTRY,
+            SCHEMA_VERSION,
+            validateParamsAgainstSchema,
+          } from "@dagnam/contracts";
+
+          const n = Object.keys(COMPONENT_REGISTRY).length;
+          if (!n) throw new Error("schema failed to load from the tarball");
+          const errs = validateParamsAgainstSchema("convolution-layer", { filters: -999 }, "n");
+          if (!errs.length) throw new Error("packed tarball validated an out-of-range value");
+          console.log(`ok: ${n} components, schema v${SCHEMA_VERSION}, ${errs.length} diagnostics`);
+          EOF
+          node smoke.mjs
+
+  parity-across-languages:
+    name: Both interpreters agree
+    needs: [python, npm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      # Two interpreters of one contract are only worth having if they say the
+      # same thing. Diffing the WHOLE diagnostic -- not just the code -- is the
+      # point of generating the schema instead of hand-writing two rule sets:
+      # `fix_hint` and `expected` reach the user too, and drift there is just as
+      # wrong and much quieter.
+      #
+      # Two deliberate exclusions, both verified rather than assumed:
+      #   * `type` -- the two runtimes genuinely differ ("parameter_error" vs
+      #     "parameter error") and that is BY DESIGN. The frontend's canonical
+      #     form is the spaced one and it translates to the spec's underscored
+      #     rule id itself (see client-validation.ts's `"parameter error":
+      #     "parameter_error"` table). Comparing it would fail forever on a
+      #     difference an adapter already handles.
+      #   * keys whose value is absent -- Python emits `null`, JS omits the key.
+      #     Semantically identical; only the encoding differs.
+      # Each record is serialized key-sorted and compact so Python's `json` and
+      # JS's `JSON.stringify` produce the same bytes for the same object.
+      - name: Diff the diagnostics for one bad config
+        run: |
+          cd npm && npm ci >/dev/null && npm run build >/dev/null && cd ..
+
+          python - <<'PY' > /tmp/py.txt
+          import dataclasses, json, sys
+          sys.path.insert(0, "python")
+          from dagnam_contracts import validate_params
+          errs = validate_params("convolution-layer", {"filters": -999}, node_id="n")
+          rows = sorted(
+              json.dumps(
+                  {k: v for k, v in dataclasses.asdict(e).items() if k != "type" and v is not None},
+                  sort_keys=True,
+                  separators=(",", ":"),
+              )
+              for e in errs
+          )
+          print(json.dumps(rows, indent=2))
+          PY
+
+          node --input-type=module <<'JS' > /tmp/js.txt
+          import { validateParamsAgainstSchema } from "./npm/dist/index.js";
+          const errs = validateParamsAgainstSchema("convolution-layer", { filters: -999 }, "n");
+          const rows = errs
+            .map((e) =>
+              JSON.stringify(
+                Object.fromEntries(
+                  Object.entries(e)
+                    .filter(([k, v]) => k !== "type" && v !== null && v !== undefined)
+                    .sort(),
+                ),
+              ),
+            )
+            .sort();
+          console.log(JSON.stringify(rows, null, 2));
+          JS
+
+          diff /tmp/py.txt /tmp/js.txt \
+            || { echo "::error::the Python and TypeScript interpreters disagree"; exit 1; }
+          cat /tmp/py.txt

@@ -26,6 +26,19 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
+      # npm and PyPI have already drifted once (npm 0.1.0 against PyPI 0.1.1)
+      # because nothing tied the two manifests together. One tag now ships both,
+      # so both must already claim it -- asserted before anything is built, let
+      # alone uploaded, since neither registry lets you take a version back.
+      - name: Assert both distributions claim the tag's version
+        run: |
+          tag="${GITHUB_REF_NAME#contracts/v}"
+          py=$(grep -m1 '^version = ' python/pyproject.toml | cut -d'"' -f2)
+          js=$(node -p "require('./npm/package.json').version")
+          echo "tag=$tag  pyproject=$py  package.json=$js"
+          [ "$py" = "$tag" ] || { echo "::error::python/pyproject.toml says $py, tag says $tag"; exit 1; }
+          [ "$js" = "$tag" ] || { echo "::error::npm/package.json says $js, tag says $tag"; exit 1; }
+
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
 
@@ -121,3 +134,73 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
+
+  # Runs alongside the PyPI chain rather than after it: they are independent
+  # artifacts, and a Python smoke failure says nothing about the JS build. The
+  # version-parity gate in `build` is what keeps the two releases in step.
+  publish-npm:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: npm/package-lock.json
+
+      # OIDC trusted publishing landed in npm 11.5.1 and the runner's bundled
+      # npm predates it. An older CLI does not say so -- it looks for the auth
+      # token this workflow deliberately does not have, and 403s.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Build
+        working-directory: npm
+        run: npm ci && npm run build
+
+      # v0.1.0 shipped broken because a module imported a sibling that was not
+      # in the package -- invisible locally, where that sibling was already
+      # installed. So exercise the PACKED tarball from an empty directory, which
+      # is what a consumer actually gets, BEFORE it is published rather than
+      # after. Also asserts the schema is inside, same as the wheel's check: a
+      # `tsc` that succeeds without it produces a package that imports and then
+      # fails at first use.
+      - name: Pack, install in isolation, and validate
+        working-directory: npm
+        run: |
+          tarball="$PWD/$(npm pack --silent)"
+          tar -tzf "$tarball" | grep -q 'package/dist/component-schema.json' \
+            || { echo "::error::component-schema.json missing from the tarball"; exit 1; }
+
+          cd "$(mktemp -d)"
+          npm init -y >/dev/null
+          npm install "$tarball" >/dev/null
+          cat > smoke.mjs <<'EOF'
+          import {
+            COMPONENT_REGISTRY,
+            SCHEMA_VERSION,
+            validateParamsAgainstSchema,
+          } from "@dagnam/contracts";
+
+          const n = Object.keys(COMPONENT_REGISTRY).length;
+          if (!n) throw new Error("schema failed to load from the tarball");
+          const errs = validateParamsAgainstSchema("convolution-layer", { filters: -999 }, "n");
+          if (!errs.length) throw new Error("packed tarball validated an out-of-range value");
+          console.log(`ok: ${n} components, schema v${SCHEMA_VERSION}, ${errs.length} diagnostics`);
+          EOF
+          node smoke.mjs
+
+      # No token, by design: the OIDC exchange IS the credential. Supplying one
+      # would route around the trusted publisher configured on npm and re-open
+      # the long-lived-secret hole it exists to close. `--access public` comes
+      # from package.json's publishConfig.
+      - name: Publish
+        working-directory: npm
+        run: npm publish
