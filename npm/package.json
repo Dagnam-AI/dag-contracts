@@ -9,12 +9,24 @@
     "directory": "npm"
   },
   "type": "module",
-  "files": [
-    "src"
-  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./component-schema.json": "./src/component-schema.json"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./component-schema.json": "./dist/component-schema.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && cp src/component-schema.json dist/",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
   },
   "publishConfig": {
     "access": "public"
