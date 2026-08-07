@@ -7,7 +7,9 @@ build/
 node_modules/
 .env*
 !.env.example
-dist/
-node_modules/
-dist/
-package-lock.json
+
+# NOT package-lock.json. It is excluded from the published tarball by
+# package.json's `files`, so it never reaches a consumer's resolution -- but it
+# is what makes `npm ci` reproducible here, and setup-node's cache keys off it.
+# Ignoring it left this repo unable to run its own CI.
+*.tgz
