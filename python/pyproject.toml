@@ -1,6 +1,6 @@
 [project]
 name = "dagnam-contracts"
-version = "0.1.2"
+version = "0.1.3"
 description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -37,3 +37,8 @@ packages = ["dagnam_contracts"]
 # to interpret, so it must be in the wheel, not merely in the repo.
 [tool.hatch.build.targets.wheel.force-include]
 "dagnam_contracts/component-schema.json" = "dagnam_contracts/component-schema.json"
+# PEP 561 marker. Without it a type checker IGNORES this package's inline
+# annotations entirely, no matter that every function is annotated -- so the
+# "Typing :: Typed" classifier above was a claim the wheel did not back up, and
+# consumers got "Stub file not found" warnings for a fully typed dependency.
+"dagnam_contracts/py.typed" = "dagnam_contracts/py.typed"

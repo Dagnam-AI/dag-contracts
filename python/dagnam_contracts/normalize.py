@@ -18,7 +18,17 @@ from typing import Any, cast
 # depend on one of its own consumers, and importing it made the wheel
 # un-importable anywhere the SDK is absent -- which local testing hid,
 # because the SDK happened to be installed in the dev venv.
-JsonValue = str | int | float | bool | None | list[object] | dict[str, object]
+#
+# RECURSIVE, via PEP 695 (safe: requires-python is >=3.12). It was previously
+# `list[object] | dict[str, object]`, which is only one level deep, so a real
+# nested JSON document did not satisfy it. That leaks: this alias is the
+# parameter AND return type of the two public `normalize_*` functions, so every
+# consumer whose own JsonValue is recursive -- dag-lib's is -- got a hard type
+# error at the call site and had to `cast` around it. Fixing the alias here
+# removes that cast from every consumer instead of each one re-inventing it.
+type JsonValue = (
+    str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
+)
 
 
 def _load() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
