@@ -39,6 +39,16 @@ jobs:
           [ "$py" = "$tag" ] || { echo "::error::python/pyproject.toml says $py, tag says $tag"; exit 1; }
           [ "$js" = "$tag" ] || { echo "::error::npm/package.json says $js, tag says $tag"; exit 1; }
 
+      # Asserted here as well as in CI, for the same reason as the version
+      # check above: a tag is what publishes, and neither registry lets you take
+      # a version back. Shipping a schema that has drifted from the registry
+      # that authors it would immortalize the exact duplication this package
+      # exists to remove -- and every consumer pins it.
+      - name: Assert the shipped schema is the compiled registry
+        run: |
+          python -m pip install --quiet pydantic
+          python -m registry.generate --check
+
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
 

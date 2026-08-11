@@ -29,6 +29,24 @@ jobs:
           echo "pyproject=$py  package.json=$js"
           [ "$py" = "$js" ] || { echo "::error::version drift: pyproject $py vs package.json $js"; exit 1; }
 
+  registry:
+    name: Registry compiles to the shipped schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      # This is what makes the repo self-contained. Without it the committed
+      # component-schema.json is an opaque blob nobody can reproduce from
+      # source, and `registry/` beside it is decoration -- editable, never
+      # compiled, silently divergent from what actually ships. Pydantic is a
+      # DEV dependency only: it is what the authoring format is written in, and
+      # it is precisely what must never reach the wheel.
+      - name: Install pydantic (authoring-only dependency)
+        run: python -m pip install --quiet pydantic
+
+      - name: Assert both distributions carry the compiled registry
+        run: python -m registry.generate --check
+
   python:
     name: Python distribution
     runs-on: ubuntu-latest
