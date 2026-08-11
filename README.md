@@ -71,8 +71,21 @@ deliberately.
 registry/     the Pydantic ComponentSpec registry and the generator (dev-only)
 python/       the dagnam-contracts distribution: schema + interpreter
 npm/          the @dagnam/contracts distribution: schema + interpreter
-tests/        conformance: both interpreters agree on the same corpus
 ```
+
+`registry/` is the **only** place the contract is authored. Editing a component
+means editing `registry/components.py` (or a message in
+`registry/diagnostics.py`) and recompiling:
+
+```sh
+python -m registry.generate          # rewrite both shipped schemas
+python -m registry.generate --check  # what CI runs
+```
+
+CI runs `--check` on every PR, so a hand-edited `component-schema.json`, a
+forgotten recompile, or a Python/TypeScript copy that drifted from its twin all
+fail before a release can immortalize them. Conformance across the two
+interpreters is checked in the same workflow (`parity-across-languages`).
 
 ## Releasing
 
@@ -88,9 +101,9 @@ tokens to leak or expire.
 
 ## Status
 
-Phase 1. The packages are being assembled; consumers still carry their existing
-copies and nothing has been switched over yet. See the extraction design in the
-`info` repository for the migration plan.
+Live. All three consumers — the platform backend, the `dagnam` SDK, and the
+Studio — read the contract from these packages; none of them carries a copy of
+the schema any more, and none of them authors the registry.
 
 ## License
 

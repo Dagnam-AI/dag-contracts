@@ -1,8 +1,9 @@
 """Canonical diagnostic-message catalog — the single source of every parameter
-validation message and fix hint. Serialized into component-schema.json by
-generate.py and rendered identically by interpret.py (backend),
-schema-param-validation.ts (frontend), and dagnam/_contracts (SDK). EDIT HERE:
-one template change propagates to all surfaces on regenerate.
+validation message and fix hint. generate.py folds it into
+component-schema.json, and every runtime renders from those templates rather
+than hand-writing strings: dagnam_contracts.interpret (Python) and
+schema-param-validation.ts (TypeScript). EDIT HERE: one template change
+propagates to every surface on recompile.
 
 Templates use Python str.format placeholders {component_id} {field} {expected}
 {got}; a literal brace in prose is written {{ }}. fix_hint is the actionable

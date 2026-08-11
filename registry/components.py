@@ -1,17 +1,20 @@
 """Canonical node/parameter schema — the single source of truth for
 architecture validation.
 
-This registry is serialized to ``info/contracts/component-schema.json`` by
-``generate.py`` and *interpreted* (never re-implemented) by the backend
-validator (``interpret.validate_params``) and the frontend validator
-(``schema-param-validation.ts``). One definition of every parameter
-constraint, one message set, three runtimes that cannot disagree. EDIT HERE.
+``generate.py`` compiles this registry into the ``component-schema.json``
+shipped by both distributions, and every runtime *interprets* that JSON rather
+than re-implementing it: ``dagnam_contracts.interpret`` (Python, used by the
+platform backend and the SDK) and ``schema-param-validation.ts`` (TypeScript,
+used by the Studio). One definition of every parameter constraint, one message
+set, runtimes that cannot disagree. **EDIT HERE** — this file is the only place
+the contract is authored, and a consumer that carries its own copy has
+re-created the bug this package exists to remove.
 
 Casing note
 -----------
-Parameter ``key`` values are written exactly as they appear in the frontend
-component library (``mvp-frontend/.../data/component-library``), which is the
-form actually persisted in diagram state — predominantly camelCase
+Parameter ``key`` values are written exactly as they appear in the Studio's
+component library, which is the form actually persisted in diagram state —
+predominantly camelCase
 (``kernelSize``) with some snake_case (``weight_decay``). The interpreters
 resolve a key case-insensitively across camelCase/snake_case variants (plus
 any explicit ``aliases``), so a single schema reads both the frontend's
