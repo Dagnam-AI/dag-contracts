@@ -93,7 +93,10 @@ function diag(
   nodeId: string,
   ctx: {
     component_id: string;
-    field?: string;
+    // Every call site below always supplies a field; unlike expected/got
+    // (genuinely omitted by some checks), there is no caller that leaves
+    // this unset, so it is required rather than defensively defaulted.
+    field: string;
     expected?: string;
     got?: string;
   },
@@ -101,7 +104,7 @@ function diag(
   const d = DIAGNOSTICS.get(code)!;
   const full = {
     component_id: ctx.component_id,
-    field: ctx.field ?? "",
+    field: ctx.field,
     expected: ctx.expected ?? "",
     got: ctx.got ?? "",
   };
