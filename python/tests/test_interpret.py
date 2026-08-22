@@ -192,6 +192,18 @@ def test_check_padding_not_typed_none() -> None:
     assert errors[0].code == "PARAM_PADDING_NOT_TYPED"
 
 
+def test_check_padding_not_typed_bare_list() -> None:
+    """A bare list is NOT_TYPED here, and must be NOT_TYPED in TypeScript too.
+
+    This is the Python half of a cross-runtime parity pin. `typeof [] ===
+    "object"` in JS, so the TS validator once let a bare array into its
+    mode-dispatch branch and reported PARAM_PADDING_BAD_MODE for exactly this
+    input. See `npm/tests/schema-param-validation.test.ts`.
+    """
+    errors = interpret._check_padding([1, 2], "padding", "conv", "n1")
+    assert errors[0].code == "PARAM_PADDING_NOT_TYPED"
+
+
 # --- _check_number --------------------------------------------------------
 
 

@@ -98,18 +98,21 @@ describe("validateParamsAgainstSchema — real schema", () => {
       expect(errors[0]?.code).toBe("PARAM_PADDING_BAD_MODE");
     });
 
-    it("a bare array hits the object branch, not NOT_TYPED (FE/BE parity gap, see report)", () => {
-      // Python's `_check_padding` treats a bare list as "not a dict" and
-      // returns PARAM_PADDING_NOT_TYPED. TypeScript's `typeof [] === "object"`
-      // means a bare array instead falls into the mode-dispatch branch here
-      // and (having no `.mode`) comes out as PARAM_PADDING_BAD_MODE. Same
-      // malformed input, two different diagnostic codes across languages.
+    it("a bare array is NOT_TYPED, matching Python (FE/BE parity)", () => {
+      // Regression test for a real parity gap. `typeof [] === "object"`, so a
+      // bare array used to fall into the mode-dispatch branch and report
+      // PARAM_PADDING_BAD_MODE, while Python's `isinstance(value, dict)`
+      // excluded lists and reported PARAM_PADDING_NOT_TYPED for the same
+      // input. Both runtimes now agree on NOT_TYPED: the value is not in the
+      // typed shape at all, and BAD_MODE would tell the user to fix a `mode`
+      // key their value does not have. `tests/test_interpret.py`'s
+      // `test_check_padding_not_typed_bare_list` pins the Python side.
       const errors = validateParamsAgainstSchema(
         "convolution-layer",
         { ...base, padding: [1, 2] },
         "n1",
       );
-      expect(errors[0]?.code).toBe("PARAM_PADDING_BAD_MODE");
+      expect(errors[0]?.code).toBe("PARAM_PADDING_NOT_TYPED");
     });
 
     it("mode same/valid as an object needs no value", () => {
