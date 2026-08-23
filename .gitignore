@@ -21,3 +21,13 @@ coverage.json
 # is what makes `npm ci` reproducible here, and setup-node's cache keys off it.
 # Ignoring it left this repo unable to run its own CI.
 *.tgz
+
+# Coverage output from `poe check` (python) and `npm run check` (npm). Both
+# gates are hard-pinned at 100%, so these are regenerated on every run and must
+# never be committed -- a stale report is worse than none, because it looks
+# authoritative.
+/npm/coverage/
+/python/.coverage
+/python/htmlcov/
+/python/coverage.json
+/python/coverage.xml
