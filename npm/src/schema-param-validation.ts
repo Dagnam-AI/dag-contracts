@@ -93,7 +93,10 @@ function diag(
   nodeId: string,
   ctx: {
     component_id: string;
-    field?: string;
+    // Every call site below always supplies a field; unlike expected/got
+    // (genuinely omitted by some checks), there is no caller that leaves
+    // this unset, so it is required rather than defensively defaulted.
+    field: string;
     expected?: string;
     got?: string;
   },
@@ -101,7 +104,7 @@ function diag(
   const d = DIAGNOSTICS.get(code)!;
   const full = {
     component_id: ctx.component_id,
-    field: ctx.field ?? "",
+    field: ctx.field,
     expected: ctx.expected ?? "",
     got: ctx.got ?? "",
   };
@@ -210,7 +213,15 @@ function checkPadding(
       }),
     ];
   }
-  if (value !== null && typeof value === "object") {
+  // `!Array.isArray` is load-bearing, not defensive: `typeof [] === "object"`,
+  // so without it a bare array such as `[1, 2]` enters the mode-dispatch below,
+  // finds no `.mode`, and reports PARAM_PADDING_BAD_MODE. Python's
+  // `isinstance(value, dict)` excludes lists, so the same input there reports
+  // PARAM_PADDING_NOT_TYPED. That is the correct code for both — the value is
+  // not in the typed shape at all — and the two runtimes must agree, because
+  // the Studio's client-side gate and the backend validator both surface this
+  // code to the same user.
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     const mode = (value as { mode?: unknown }).mode;
     if (mode !== "valid" && mode !== "same" && mode !== "explicit") {
       return [

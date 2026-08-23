@@ -26,6 +26,15 @@ dependencies = []
 Homepage = "https://github.com/Dagnam-AI/dag-contracts"
 Source = "https://github.com/Dagnam-AI/dag-contracts"
 
+[dependency-groups]
+dev = [
+    "poethepoet>=0.46.0",
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -42,3 +51,76 @@ packages = ["dagnam_contracts"]
 # "Typing :: Typed" classifier above was a claim the wheel did not back up, and
 # consumers got "Stub file not found" warnings for a fully typed dependency.
 "dagnam_contracts/py.typed" = "dagnam_contracts/py.typed"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["dagnam_contracts"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Hard gate: the suite must keep dagnam_contracts at 100% statement AND branch
+# coverage (branch = true above folds branch coverage into the total % that
+# fail_under checks). Any regression fails `uv run poe check`.
+fail_under = 100
+
+[tool.poe.tasks]
+test = { cmd = "pytest tests -q --cov=dagnam_contracts --cov-branch --cov-report=term-missing", help = "Run the test suite with branch coverage (fails under 100%)" }
+test-cov = { cmd = "pytest tests -q --cov=dagnam_contracts --cov-branch --cov-report=term-missing --cov-report=html:htmlcov --cov-report=json:coverage.json", help = "Run tests and generate terminal, HTML, and JSON coverage reports" }
+lint = { cmd = "ruff check dagnam_contracts tests", help = "Lint" }
+format-check = { cmd = "ruff format --check dagnam_contracts tests", help = "Check formatting" }
+typecheck = { cmd = "pyright dagnam_contracts tests", help = "Type-check (strict)" }
+check = { sequence = ["lint", "format-check", "typecheck", "test"], help = "Run every quality gate" }
+
+
+[tool.ruff]
+# 100, matching the sibling SDK. Without this ruff defaults to 88 and would
+# rewrap source that was authored to the workspace's width.
+line-length = 100
+target-version = "py312"
+src = ["dagnam_contracts", "tests"]
+
+[tool.ruff.lint.isort]
+# Matching the sibling SDK, so the two public packages sort imports the same
+# way. Without force-sort-within-sections ruff reorders existing source purely
+# on `import x` vs `from x import y`, which is churn, not a fix.
+known-first-party = ["dagnam_contracts"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.pyright]
+include = ["dagnam_contracts", "tests"]
+exclude = ["**/__pycache__", ".venv"]
+typeCheckingMode = "strict"
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+reportMissingImports = "error"
+reportUnusedImport = "error"
+
+# Strict mode minus its "completeness" family, matching the sibling SDK. This
+# package's whole subject matter is dynamic JSON -- `JsonValue` is a recursive
+# union and every fixture is a dict literal -- so reportUnknown*/reportMissing*
+# fire on essentially every line and can only be silenced by casting at each
+# boundary, which buys nothing. Every *bug-catching* strict diagnostic
+# (reportArgumentType, reportCallIssue, reportIndexIssue, reportOptional*,
+# reportReturnType, reportAttributeAccessIssue, ...) stays on -- those are the
+# ones that caught the 119 real type errors in the first test pass.
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportMissingTypeStubs = "warning"
+
+# Tests reach into private (`_`-prefixed) helpers to assert on internal
+# behaviour directly -- that is what a unit test is for, not a design smell.
+# Scoped to the tests root so production type checking keeps the rule.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportPrivateUsage = "none"

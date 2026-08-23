@@ -26,9 +26,7 @@ from typing import Any, cast
 # consumer whose own JsonValue is recursive -- dag-lib's is -- got a hard type
 # error at the call site and had to `cast` around it. Fixing the alias here
 # removes that cast from every consumer instead of each one re-inventing it.
-type JsonValue = (
-    str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
-)
+type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 
 
 def _load() -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
