@@ -211,6 +211,16 @@ jobs:
       # would route around the trusted publisher configured on npm and re-open
       # the long-lived-secret hole it exists to close. `--access public` comes
       # from package.json's publishConfig.
+      # Idempotent on re-runs: the 0.2.0 release published npm and then died at
+      # the PyPI metadata check, and npm refuses to publish over an existing
+      # version. A re-run of the moved tag must skip what already shipped and
+      # still carry the Python half through.
       - name: Publish
         working-directory: npm
-        run: npm publish
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@dagnam/contracts@${version}" version >/dev/null 2>&1; then
+            echo "@dagnam/contracts@${version} is already on npm; skipping publish"
+          else
+            npm publish
+          fi
