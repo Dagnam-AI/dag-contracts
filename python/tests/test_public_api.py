@@ -17,6 +17,8 @@ EXPECTED_EXPORTS = [
     "REDACTION_TEMPLATE",
     "SCHEMA_VERSION",
     "SHINGLE_SIZE",
+    "Z95",
+    "Agreement",
     "ContaminationResult",
     "DedupResult",
     "NearDedupResult",
@@ -34,14 +36,19 @@ EXPECTED_EXPORTS = [
     "compute_split_overlap",
     "estimate_jaccard",
     "minhash_signature",
+    "modal_keys",
     "normalize_architecture_config",
     "normalize_diagram_state",
+    "normalize_label",
     "render_chat_prompt",
     "row_text",
     "scan_rows",
+    "score_json",
+    "score_labels",
     "shingles",
     "validate_architecture",
     "validate_params",
+    "wilson_interval",
 ]
 
 

@@ -20,6 +20,15 @@ package ships the schema interpreter alone.
 from __future__ import annotations
 
 from dagnam_contracts.architecture import validate_architecture
+from dagnam_contracts.audit import (
+    Z95,
+    Agreement,
+    modal_keys,
+    normalize_label,
+    score_json,
+    score_labels,
+    wilson_interval,
+)
 from dagnam_contracts.hygiene import (
     BANDS,
     DEFAULT_THRESHOLD,
@@ -73,6 +82,8 @@ __all__ = [
     "REDACTION_TEMPLATE",
     "SCHEMA_VERSION",
     "SHINGLE_SIZE",
+    "Z95",
+    "Agreement",
     "ContaminationResult",
     "DedupResult",
     "NearDedupResult",
@@ -90,12 +101,17 @@ __all__ = [
     "compute_split_overlap",
     "estimate_jaccard",
     "minhash_signature",
+    "modal_keys",
     "normalize_architecture_config",
     "normalize_diagram_state",
+    "normalize_label",
     "render_chat_prompt",
     "row_text",
     "scan_rows",
+    "score_json",
+    "score_labels",
     "shingles",
     "validate_architecture",
     "validate_params",
+    "wilson_interval",
 ]
