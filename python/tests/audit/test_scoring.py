@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from dagnam_contracts.audit.scoring import (
+    Z95,
     Agreement,
     modal_keys,
     normalize_label,
@@ -19,6 +20,10 @@ from dagnam_contracts.audit.scoring import (
 
 
 class TestWilson:
+    def test_z95_is_the_two_sided_normal_quantile(self) -> None:
+        """Pinned: every consumer's interval is only comparable if this literal is."""
+        assert Z95 == 1.959963984540054
+
     def test_zero_n_is_the_unit_interval(self) -> None:
         assert wilson_interval(0, 0) == (0.0, 1.0)
 
@@ -98,11 +103,21 @@ class TestScoreJson:
         agreement = score_json(["not json", "[1]"], ['{"a": 1}', '{"a": 1}'], ["a"])
         assert agreement.value == 0.0
 
+    def test_key_absent_from_truth_is_a_false_positive_only(self) -> None:
+        agreement = score_json(['{"a": 1}'], ["{}"], ["a"])
+        assert agreement.n == 1
+        assert agreement.field_precision == 0.0
+        assert agreement.field_recall == 0.0
+        assert agreement.value == 0.0
+
     def test_modal_keys_empty_when_nothing_parses(self) -> None:
         assert modal_keys(["nope"]) == []
 
 
 def test_agreement_is_frozen() -> None:
     agreement = Agreement(metric="exact", value=1.0, ci95=(1.0, 1.0), n=1)
+    # Through `setattr`, so the assertion is the frozen dataclass's runtime refusal
+    # rather than a type error the checker would have to be told to ignore.
+    field = "value"
     with pytest.raises(AttributeError):
-        agreement.value = 0.5  # type: ignore[misc]
+        setattr(agreement, field, 0.5)

@@ -18,9 +18,13 @@ import math
 import string
 from typing import Any
 
+from dagnam_contracts.normalize import JsonValue
+
 Z95 = 1.959963984540054
 """Two-sided 95% normal quantile."""
 
+# Both ends, unlike dag-lib `derive.py`'s `rstrip`: a quoted `"Refund"` has to normalize
+# like a bare one. dag-lib adopts this at its cutover, so the two stay one definition.
 _SURROUNDING = string.punctuation + string.whitespace
 
 
@@ -43,9 +47,9 @@ class Agreement:
     field_recall: float | None = None
     field_f1: float | None = None
 
-    def to_json(self) -> dict[str, object]:
+    def to_json(self) -> dict[str, JsonValue]:
         """The ``agreement`` object of ``audit-report.json`` (spec section 7)."""
-        extras: dict[str, object] = {
+        extras: dict[str, JsonValue] = {
             key: value
             for key, value in (
                 ("exact", self.exact),
