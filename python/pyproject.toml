@@ -1,6 +1,6 @@
 [project]
 name = "dagnam-contracts"
-version = "0.2.0"
+version = "0.3.0"
 description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -56,6 +56,10 @@ packages = ["dagnam_contracts"]
 # "Typing :: Typed" classifier above was a claim the wheel did not back up, and
 # consumers got "Stub file not found" warnings for a fully typed dependency.
 "dagnam_contracts/py.typed" = "dagnam_contracts/py.typed"
+# The open-model reference rows the audit report compares against. Loaded via
+# importlib.resources, so like the schema it is the artifact, not a repo file:
+# without it in the wheel `load_reference_models()` raises at import time.
+"dagnam_contracts/audit/open-models.json" = "dagnam_contracts/audit/open-models.json"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
