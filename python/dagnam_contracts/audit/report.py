@@ -24,33 +24,44 @@ def _sub(entry: Mapping[str, Any], key: str) -> Mapping[str, Any]:
 
 
 def winner_of(candidates: Sequence[Mapping[str, Any]], *, floor: float) -> dict[str, Any] | None:
-    """The report's ``winner`` block over scored candidate dicts, or ``None``."""
+    """The report's ``winner`` block over the candidate dicts, or ``None``.
+
+    A candidate with no ``agreement`` or no priced ``serving_cost_usd_month`` is
+    not a point on the frontier, so it is skipped -- on its numbers, never on a
+    status word, which keeps the report's status vocabulary out of the contract.
+
+    ``floor`` is the default; a candidate whose ``agreement`` records its own
+    ``floor`` replaces it, so the run's own quality bar wins over the caller's.
+    Like the CLI this is one running value rather than a per-candidate one: the
+    last recorded floor is the bar every point is then held to.
+    """
     points: list[CandidateResult] = []
-    by_kind: dict[str, Mapping[str, Any]] = {}
     for c in candidates:
-        if c.get("status") != "scored":
-            continue
-        ci = _sub(c, "agreement").get("ci95")
+        agreement = _sub(c, "agreement")
         cost = _number(_sub(c, "serving_cost_usd_month").get("value"))
-        if not isinstance(ci, list) or len(ci) != 2 or cost is None:
+        if not agreement or cost is None:
             continue
-        kind = str(c["kind"])
-        by_kind[kind] = c
+        floor = float(agreement.get("floor", floor))
+        ci = agreement.get("ci95")
+        if not isinstance(ci, list) or len(ci) != 2:
+            continue
         points.append(
             CandidateResult(
-                kind, (float(ci[0]), float(ci[1])), cost, _number(_sub(c, "latency_ms").get("p95"))
+                str(c["kind"]),
+                (float(ci[0]), float(ci[1])),
+                cost,
+                _number(_sub(c, "latency_ms").get("p95")),
             )
         )
     winner = frontier(points, floor=floor)
     if winner is None:
         return None
-    chosen = by_kind[winner.kind]
+    chosen = next(c for c in candidates if str(c["kind"]) == winner.kind)
     return {
         "kind": winner.kind,
-        "deployment_id": chosen.get("deployment_id"),
         "cost_usd_month": winner.cost_usd_month,
         "agreement_lo": winner.agreement_lo,
-        "p95_ms": _number(_sub(chosen, "latency_ms").get("p95")),
+        "deployment_id": chosen.get("deployment_id"),
     }
 
 
