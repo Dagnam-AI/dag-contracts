@@ -87,6 +87,26 @@ forgotten recompile, or a Python/TypeScript copy that drifted from its twin all
 fail before a release can immortalize them. Conformance across the two
 interpreters is checked in the same workflow (`parity-across-languages`).
 
+## Dataset hygiene and prompt rendering (Python-only)
+
+Beyond the schema, the Python distribution carries the primitives that must give
+the *same answer* on the customer's machine and on a platform worker: `hygiene`
+(exact and near duplicates, split contamination, PII scan and redaction) and
+`prompts` (the chat-prompt renderer). The npm package ships the schema
+interpreter alone — none of this has a TypeScript consumer.
+
+Since 0.3.0 that list includes `audit`, the workload-audit contract. The SDK
+scores a holdout locally and the platform scores one on a worker, and a report
+either side writes has to reach the same verdict from the same numbers, so the
+whole decision lives here: the agreement scorers (`score_labels`, `score_json`,
+`wilson_interval`), the economics bands and the frontier rule (`ratio_status`,
+`frontier`, `customer_verdict`), the serving rate card
+(`serving_cost_usd_month`), the report's derived blocks (`winner_of`,
+`switch_block`, `render_switch_snippet`) and a dated table of open instruct
+models to compare against (`load_reference_models`). The reference rows are
+reference only — the audit never measures them — and each was checked against
+its Hugging Face model card on `REFERENCE_AS_OF`.
+
 ## Releasing
 
 One tag publishes both packages from one source, so they can never be published

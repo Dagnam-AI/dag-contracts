@@ -1,0 +1,100 @@
+{
+  "as_of": "2026-09-07",
+  "_note": "Reference rows only: the audit never measures these, it compares against them. Every row was checked against the sources below on as_of. parameters is the exact safetensors total the hub reports; context_length is the card's stated window (the natively supported one where the card distinguishes native from YaRN-extended).",
+  "_sources": {
+    "meta-llama/Llama-3.3-70B-Instruct": [
+      "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct"
+    ],
+    "meta-llama/Llama-3.2-3B-Instruct": [
+      "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct"
+    ],
+    "Qwen/Qwen2.5-0.5B-Instruct": [
+      "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct"
+    ],
+    "Qwen/Qwen2.5-7B-Instruct": [
+      "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct"
+    ],
+    "Qwen/Qwen3-8B": [
+      "https://huggingface.co/Qwen/Qwen3-8B"
+    ],
+    "mistralai/Mistral-7B-Instruct-v0.3": [
+      "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+      "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3/raw/main/config.json"
+    ],
+    "google/gemma-3-4b-it": [
+      "https://huggingface.co/google/gemma-3-4b-it"
+    ],
+    "microsoft/Phi-4-mini-instruct": [
+      "https://huggingface.co/microsoft/Phi-4-mini-instruct"
+    ],
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": [
+      "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/raw/main/config.json"
+    ]
+  },
+  "models": [
+    {
+      "id": "meta-llama/Llama-3.3-70B-Instruct",
+      "family": "llama-3.3",
+      "parameters": 70553706496,
+      "license": "llama3.3",
+      "context_length": 131072
+    },
+    {
+      "id": "meta-llama/Llama-3.2-3B-Instruct",
+      "family": "llama-3.2",
+      "parameters": 3212749824,
+      "license": "llama3.2",
+      "context_length": 131072
+    },
+    {
+      "id": "Qwen/Qwen2.5-0.5B-Instruct",
+      "family": "qwen2.5",
+      "parameters": 494032768,
+      "license": "apache-2.0",
+      "context_length": 32768
+    },
+    {
+      "id": "Qwen/Qwen2.5-7B-Instruct",
+      "family": "qwen2.5",
+      "parameters": 7615616512,
+      "license": "apache-2.0",
+      "context_length": 131072
+    },
+    {
+      "id": "Qwen/Qwen3-8B",
+      "family": "qwen3",
+      "parameters": 8190735360,
+      "license": "apache-2.0",
+      "context_length": 32768
+    },
+    {
+      "id": "mistralai/Mistral-7B-Instruct-v0.3",
+      "family": "mistral",
+      "parameters": 7248023552,
+      "license": "apache-2.0",
+      "context_length": 32768
+    },
+    {
+      "id": "google/gemma-3-4b-it",
+      "family": "gemma-3",
+      "parameters": 4300079472,
+      "license": "gemma",
+      "context_length": 131072
+    },
+    {
+      "id": "microsoft/Phi-4-mini-instruct",
+      "family": "phi-4",
+      "parameters": 3836021760,
+      "license": "mit",
+      "context_length": 131072
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+      "family": "deepseek-r1-distill",
+      "parameters": 7615616512,
+      "license": "mit",
+      "context_length": 131072
+    }
+  ]
+}
