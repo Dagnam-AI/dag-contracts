@@ -17,7 +17,9 @@ the deployment cost planner's instance-hour prices, as
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from importlib import resources
+import json
+from typing import Any, Literal
 
 from dagnam_contracts.audit.verdict import DAYS_PER_MONTH
 
@@ -28,6 +30,21 @@ SERVING_RATES: Mapping[StudentKind, Mapping[str, float]] = {
     "gpu-small-llm": {"usd_per_m_output_tokens": 1.95},
 }
 """The two student kinds' estimated rates; the assumptions behind them are this module's docstring."""
+
+
+def load_serving_rates() -> dict[str, Any]:
+    """The bundled ``serving-rates.json``: the same rates plus their basis and assumptions.
+
+    :data:`SERVING_RATES` is what the formulas below multiply; this is what a
+    report and the Studio *show*, so every number arrives labelled ``estimated``
+    with the instance and utilization it came from rather than as a bare figure.
+    The npm package ships the identical file, which is what lets a Studio price
+    a comparison row the same way the wheel priced the candidate beside it.
+    """
+    text = (
+        resources.files("dagnam_contracts.audit").joinpath("serving-rates.json").read_text("utf-8")
+    )
+    return json.loads(text)
 
 
 def serving_cost_usd_month(
@@ -41,4 +58,4 @@ def serving_cost_usd_month(
     return output_tokens_month / 1_000_000 * SERVING_RATES[kind]["usd_per_m_output_tokens"]
 
 
-__all__ = ["SERVING_RATES", "StudentKind", "serving_cost_usd_month"]
+__all__ = ["SERVING_RATES", "StudentKind", "load_serving_rates", "serving_cost_usd_month"]

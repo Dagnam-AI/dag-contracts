@@ -35,6 +35,7 @@ from dagnam_contracts.audit.scoring import (
 from dagnam_contracts.audit.serving import (
     SERVING_RATES,
     StudentKind,
+    load_serving_rates,
     serving_cost_usd_month,
 )
 from dagnam_contracts.audit.verdict import (
@@ -83,6 +84,7 @@ __all__ = [
     "customer_verdict",
     "frontier",
     "load_reference_models",
+    "load_serving_rates",
     "modal_keys",
     "normalize_label",
     "ratio_status",

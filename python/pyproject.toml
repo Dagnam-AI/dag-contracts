@@ -60,6 +60,10 @@ packages = ["dagnam_contracts"]
 # importlib.resources, so like the schema it is the artifact, not a repo file:
 # without it in the wheel `load_reference_models()` raises at import time.
 "dagnam_contracts/audit/open-models.json" = "dagnam_contracts/audit/open-models.json"
+# Same rule for the serving rate card: `load_serving_rates()` reads it through
+# importlib.resources, and the npm package ships the identical bytes so the
+# Studio and the wheel price the same audit the same way.
+"dagnam_contracts/audit/serving-rates.json" = "dagnam_contracts/audit/serving-rates.json"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

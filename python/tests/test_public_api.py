@@ -59,6 +59,7 @@ EXPECTED_EXPORTS = [
     "estimate_jaccard",
     "frontier",
     "load_reference_models",
+    "load_serving_rates",
     "minhash_signature",
     "modal_keys",
     "normalize_architecture_config",

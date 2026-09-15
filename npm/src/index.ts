@@ -8,6 +8,15 @@
 
 import schema from "./component-schema.json" with { type: "json" };
 
+export {
+  CANCELLED_SCHEMA,
+  DELETED_SCHEMA,
+  REFERENCE_AS_OF,
+  REFERENCE_MODELS,
+  REPORT_SCHEMA,
+  SERVING_RATES,
+} from "./audit.js";
+export type { ReferenceModel, ServingRate, ServingRateCard } from "./audit.js";
 export { validateParamsAgainstSchema } from "./schema-param-validation.js";
 export { isParamApplicable, paramIsInteger } from "./component-schema-fields.js";
 export type { Severity, ValidationResult } from "./types.js";
@@ -21,3 +30,5 @@ export const COMPONENT_REGISTRY: Record<string, unknown> = Object.fromEntries(
 );
 
 export { default as componentSchema } from "./component-schema.json" with { type: "json" };
+export { default as openModels } from "./open-models.json" with { type: "json" };
+export { default as servingRates } from "./serving-rates.json" with { type: "json" };

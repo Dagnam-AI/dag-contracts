@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import pytest
 
-from dagnam_contracts.audit.serving import SERVING_RATES, serving_cost_usd_month
+from dagnam_contracts.audit.serving import (
+    SERVING_RATES,
+    load_serving_rates,
+    serving_cost_usd_month,
+)
 
 
 def test_rates_are_the_shipped_rate_card() -> None:
@@ -30,3 +34,17 @@ def test_gpu_small_llm_is_priced_per_million_output_tokens() -> None:
     )
     assert cost == pytest.approx(266.7 * 30 * 3 / 1_000_000 * 1.95)
     assert cost == pytest.approx(0.04680585)
+
+
+def test_the_shipped_card_carries_the_rates_the_formulas_use() -> None:
+    """The literal above is what prices an audit; the card is what a report and
+    the Studio display. Two statements of one number drift, so this is the gate
+    that says they cannot -- including the `estimated` basis, which is a claim
+    about the numbers and not decoration."""
+    card = load_serving_rates()
+    assert card["basis"] == "estimated"
+    for kind, rates in SERVING_RATES.items():
+        row = card["rates"][kind]
+        assert row["basis"] == "estimated"
+        assert row["assumptions"]
+        assert {k: v for k, v in row.items() if isinstance(v, int | float)} == rates
