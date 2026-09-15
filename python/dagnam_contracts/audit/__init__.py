@@ -15,7 +15,9 @@ from dagnam_contracts.audit.reference import (
     load_reference_models,
 )
 from dagnam_contracts.audit.report import (
+    CANCELLED_SCHEMA,
     DEFAULT_BASE_URL,
+    DELETED_SCHEMA,
     REPORT_SCHEMA,
     render_switch_snippet,
     switch_block,
@@ -55,8 +57,10 @@ from dagnam_contracts.audit.verdict import (
 )
 
 __all__ = [
+    "CANCELLED_SCHEMA",
     "DAYS_PER_MONTH",
     "DEFAULT_BASE_URL",
+    "DELETED_SCHEMA",
     "FLOOR_JSON",
     "FLOOR_LABEL",
     "MAINTENANCE_USD_MONTH",

@@ -8,6 +8,7 @@ from dagnam_contracts import audit, hygiene
 EXPECTED_EXPORTS = [
     "Agreement",
     "BANDS",
+    "CANCELLED_SCHEMA",
     "COMPONENT_REGISTRY",
     "CandidateResult",
     "ContaminationResult",
@@ -15,6 +16,7 @@ EXPECTED_EXPORTS = [
     "DAYS_PER_MONTH",
     "DEFAULT_BASE_URL",
     "DEFAULT_THRESHOLD",
+    "DELETED_SCHEMA",
     "DedupResult",
     "FLOOR_JSON",
     "FLOOR_LABEL",

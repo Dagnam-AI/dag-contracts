@@ -24,8 +24,10 @@ from __future__ import annotations
 
 from dagnam_contracts.architecture import validate_architecture
 from dagnam_contracts.audit import (
+    CANCELLED_SCHEMA,
     DAYS_PER_MONTH,
     DEFAULT_BASE_URL,
+    DELETED_SCHEMA,
     FLOOR_JSON,
     FLOOR_LABEL,
     MAINTENANCE_USD_MONTH,
@@ -102,10 +104,12 @@ from dagnam_contracts.schema import (
 
 __all__ = [
     "BANDS",
+    "CANCELLED_SCHEMA",
     "COMPONENT_REGISTRY",
     "DAYS_PER_MONTH",
     "DEFAULT_BASE_URL",
     "DEFAULT_THRESHOLD",
+    "DELETED_SCHEMA",
     "FLOOR_JSON",
     "FLOOR_LABEL",
     "LAYER_TYPE_TO_COMPONENT",
