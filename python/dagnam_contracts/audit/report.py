@@ -1,4 +1,7 @@
-"""The report's derived blocks, computed from candidate dicts in the report's own shape."""
+"""The report's derived blocks and the schema ids audit artifacts are stamped with.
+
+The blocks are computed from candidate dicts in the report's own shape.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +11,16 @@ from typing import Any
 from dagnam_contracts.audit.verdict import CandidateResult, frontier
 
 REPORT_SCHEMA = "dagnam.audit.report/1"
+DELETED_SCHEMA = "dagnam.audit.deleted/1"
+"""The receipt a delete writes; unchanged, and never used for a cancel."""
+CANCELLED_SCHEMA = "dagnam.audit.cancelled/1"
+"""The receipt a cancel writes.
+
+Cancelling and deleting are different events -- one stops a run and leaves its
+artifacts, the other removes them -- and a reader that has to inspect a status
+word to tell which receipt it is holding cannot route on the schema id, which
+is the one field a schema id exists to make sufficient.
+"""
 DEFAULT_BASE_URL = "https://api.dagnam.ai/v1"
 """The OpenAI-compatible root a switched client points at."""
 
@@ -62,6 +75,7 @@ def winner_of(candidates: Sequence[Mapping[str, Any]], *, floor: float) -> dict[
         "cost_usd_month": winner.cost_usd_month,
         "agreement_lo": winner.agreement_lo,
         "deployment_id": chosen.get("deployment_id"),
+        "candidate_id": chosen.get("candidate_id"),
     }
 
 
@@ -95,7 +109,9 @@ def render_switch_snippet(
 
 
 __all__ = [
+    "CANCELLED_SCHEMA",
     "DEFAULT_BASE_URL",
+    "DELETED_SCHEMA",
     "REPORT_SCHEMA",
     "render_switch_snippet",
     "switch_block",

@@ -61,12 +61,14 @@ jobs:
 
       # The schema IS the artifact. A wheel that builds but omits it would
       # install cleanly and fail at first use, so assert it is inside.
-      - name: Assert the schema is in the wheel
+      - name: Assert the shipped data files are in the wheel
         working-directory: python
         run: |
           wheel=$(ls dist/*.whl)
-          python -m zipfile -l "$wheel" | grep -q 'dagnam_contracts/component-schema.json' \
-            || { echo "::error::component-schema.json missing from $wheel"; exit 1; }
+          for data in component-schema.json audit/open-models.json audit/serving-rates.json; do
+            python -m zipfile -l "$wheel" | grep -q "dagnam_contracts/$data" \
+              || { echo "::error::$data missing from $wheel"; exit 1; }
+          done
           echo "schema present in $wheel"
 
       - name: Check distribution metadata
@@ -186,8 +188,10 @@ jobs:
         working-directory: npm
         run: |
           tarball="$PWD/$(npm pack --silent)"
-          tar -tzf "$tarball" | grep -q 'package/dist/component-schema.json' \
-            || { echo "::error::component-schema.json missing from the tarball"; exit 1; }
+          for data in component-schema.json open-models.json serving-rates.json; do
+            tar -tzf "$tarball" | grep -q "package/dist/$data" \
+              || { echo "::error::$data missing from the tarball"; exit 1; }
+          done
 
           cd "$(mktemp -d)"
           npm init -y >/dev/null

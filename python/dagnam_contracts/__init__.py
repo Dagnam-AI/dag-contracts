@@ -16,16 +16,19 @@ Since 0.2.0 the package also carries the dataset-hygiene primitives (``hygiene``
 and the chat-prompt renderer (``prompts``); since 0.3.0, the workload-audit
 contract (``audit``) — the agreement scorers, the economics bands, the frontier
 rule, the serving rate card, the report's derived blocks and the open-model
-reference rows. All three are Python-only — the npm package ships the schema
-interpreter alone.
+reference rows. The logic is Python-only — the npm package ships the schema
+interpreter plus, since 0.3.1, the audit's reference rows and serving rate card,
+which a Studio displays rather than computes.
 """
 
 from __future__ import annotations
 
 from dagnam_contracts.architecture import validate_architecture
 from dagnam_contracts.audit import (
+    CANCELLED_SCHEMA,
     DAYS_PER_MONTH,
     DEFAULT_BASE_URL,
+    DELETED_SCHEMA,
     FLOOR_JSON,
     FLOOR_LABEL,
     MAINTENANCE_USD_MONTH,
@@ -48,6 +51,7 @@ from dagnam_contracts.audit import (
     customer_verdict,
     frontier,
     load_reference_models,
+    load_serving_rates,
     modal_keys,
     normalize_label,
     ratio_status,
@@ -93,7 +97,7 @@ from dagnam_contracts.normalize import (
     normalize_architecture_config,
     normalize_diagram_state,
 )
-from dagnam_contracts.prompts import render_chat_prompt
+from dagnam_contracts.prompts import parse_chat_prompt, render_chat_prompt
 from dagnam_contracts.schema import (
     COMPONENT_REGISTRY,
     LAYER_TYPE_TO_COMPONENT,
@@ -102,10 +106,12 @@ from dagnam_contracts.schema import (
 
 __all__ = [
     "BANDS",
+    "CANCELLED_SCHEMA",
     "COMPONENT_REGISTRY",
     "DAYS_PER_MONTH",
     "DEFAULT_BASE_URL",
     "DEFAULT_THRESHOLD",
+    "DELETED_SCHEMA",
     "FLOOR_JSON",
     "FLOOR_LABEL",
     "LAYER_TYPE_TO_COMPONENT",
@@ -152,11 +158,13 @@ __all__ = [
     "estimate_jaccard",
     "frontier",
     "load_reference_models",
+    "load_serving_rates",
     "minhash_signature",
     "modal_keys",
     "normalize_architecture_config",
     "normalize_diagram_state",
     "normalize_label",
+    "parse_chat_prompt",
     "ratio_status",
     "render_chat_prompt",
     "render_switch_snippet",

@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from dagnam_contracts.audit.report import (
+    CANCELLED_SCHEMA,
     DEFAULT_BASE_URL,
+    DELETED_SCHEMA,
     REPORT_SCHEMA,
     render_switch_snippet,
     switch_block,
@@ -17,6 +19,7 @@ CANDIDATES: list[dict[str, Any]] = [
         "kind": "head_tune",
         "status": "scored",
         "deployment_id": "dep-1",
+        "candidate_id": "cand-1",
         "agreement": {"ci95": [0.99, 1.0]},
         "latency_ms": {"p95": 556.0},
         "serving_cost_usd_month": {"value": 12.0},
@@ -38,17 +41,34 @@ def test_schema_and_base_url_are_the_shipped_values() -> None:
     assert DEFAULT_BASE_URL == "https://api.dagnam.ai/v1"
 
 
+def test_a_cancel_receipt_has_its_own_schema_id() -> None:
+    """A cancel is not a delete: routing on the schema id must be enough to tell them apart."""
+    assert DELETED_SCHEMA == "dagnam.audit.deleted/1"
+    assert CANCELLED_SCHEMA == "dagnam.audit.cancelled/1"
+    assert CANCELLED_SCHEMA != DELETED_SCHEMA
+
+
 # Controller ruling (Task 2 review, round 1): the contract's `winner` block must be
 # dag-lib `report.py:_winner`'s block exactly -- four keys, no `p95_ms`. That overrides
-# the brief's five-key expectation, which was the lossy part of its sketch.
+# the brief's five-key expectation, which was the lossy part of its sketch. Since 0.3.1
+# `candidate_id` joins them, so the block NAMES the winning row instead of leaving every
+# reader to re-derive it by kind; the original four are unchanged.
 def test_winner_of_reads_candidate_dicts() -> None:
     winner = winner_of(CANDIDATES, floor=0.95)
     assert winner == {
         "kind": "head_tune",
         "deployment_id": "dep-1",
+        "candidate_id": "cand-1",
         "cost_usd_month": 12.0,
         "agreement_lo": 0.99,
     }
+
+
+def test_winner_of_carries_an_explicitly_null_candidate_id_through() -> None:
+    """A row that records `candidate_id: null` reads the same as one that omits it."""
+    winner = winner_of([{**CANDIDATES[0], "candidate_id": None}], floor=0.95)
+    assert winner is not None
+    assert winner["candidate_id"] is None
 
 
 def test_winner_of_ignores_unscored_and_returns_none() -> None:
@@ -83,6 +103,9 @@ def test_winner_of_skips_a_candidate_whose_numbers_are_unusable() -> None:
     assert winner_of([*unusable, CANDIDATES[1]], floor=0.90) == {
         "kind": "sft_small",
         "deployment_id": "dep-2",
+        # `sft_small` carries no id -- the CLI's local candidates never do -- so
+        # the key is present and null rather than absent.
+        "candidate_id": None,
         "cost_usd_month": 40.0,
         "agreement_lo": 0.90,
     }
