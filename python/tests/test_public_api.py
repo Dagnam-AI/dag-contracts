@@ -64,6 +64,7 @@ EXPECTED_EXPORTS = [
     "normalize_architecture_config",
     "normalize_diagram_state",
     "normalize_label",
+    "parse_chat_prompt",
     "ratio_status",
     "render_chat_prompt",
     "render_switch_snippet",

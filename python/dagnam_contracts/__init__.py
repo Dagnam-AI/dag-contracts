@@ -95,7 +95,7 @@ from dagnam_contracts.normalize import (
     normalize_architecture_config,
     normalize_diagram_state,
 )
-from dagnam_contracts.prompts import render_chat_prompt
+from dagnam_contracts.prompts import parse_chat_prompt, render_chat_prompt
 from dagnam_contracts.schema import (
     COMPONENT_REGISTRY,
     LAYER_TYPE_TO_COMPONENT,
@@ -161,6 +161,7 @@ __all__ = [
     "normalize_architecture_config",
     "normalize_diagram_state",
     "normalize_label",
+    "parse_chat_prompt",
     "ratio_status",
     "render_chat_prompt",
     "render_switch_snippet",

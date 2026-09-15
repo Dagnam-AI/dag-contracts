@@ -6,7 +6,7 @@ here ARE the contract: a change to any of them is a train/serve skew.
 
 from __future__ import annotations
 
-from dagnam_contracts.prompts import render_chat_prompt
+from dagnam_contracts.prompts import parse_chat_prompt, render_chat_prompt
 
 
 def test_render_chat_prompt_is_byte_exact_and_drops_assistant_turns() -> None:
@@ -47,3 +47,46 @@ def test_render_chat_prompt_preserves_content_bytes_including_trailing_newlines(
 def test_render_chat_prompt_is_deterministic() -> None:
     messages = [{"role": "user", "content": "same"}]
     assert render_chat_prompt(messages, system="s") == render_chat_prompt(messages, system="s")
+
+
+def test_parse_chat_prompt_inverts_the_rendering() -> None:
+    messages = [
+        {"role": "user", "content": "hi"},
+        {"role": "tool", "content": "42"},
+        {"role": "user", "content": "again"},
+    ]
+    assert parse_chat_prompt(render_chat_prompt(messages, system=None)) == messages
+
+
+def test_parse_chat_prompt_reads_a_system_prompt_back_as_its_own_turn() -> None:
+    """`render_chat_prompt` renders the system prompt as a marker block like any
+    other, so the inverse reads it back as one; a caller that wants it separate
+    splits on the role, which is what the marker records."""
+    text = render_chat_prompt([{"role": "user", "content": "hi"}], system="Label it.")
+    assert parse_chat_prompt(text) == [
+        {"role": "system", "content": "Label it."},
+        {"role": "user", "content": "hi"},
+    ]
+
+
+def test_parse_chat_prompt_keeps_a_chunk_before_the_first_marker() -> None:
+    """A row truncated from the front has no leading marker; dropping the chunk
+    would drop text the classifier actually saw, so it becomes a user turn."""
+    assert parse_chat_prompt("cut off\n<|user|>\nhi\n") == [
+        {"role": "user", "content": "cut off"},
+        {"role": "user", "content": "hi"},
+    ]
+    assert parse_chat_prompt("no markers at all") == [
+        {"role": "user", "content": "no markers at all"}
+    ]
+
+
+def test_parse_chat_prompt_of_empty_text_is_empty() -> None:
+    assert parse_chat_prompt("") == []
+
+
+def test_parse_chat_prompt_strips_only_the_renderings_own_trailing_newline() -> None:
+    """The renderer appends exactly one newline per turn, so exactly one comes
+    back off -- content that ended in a blank line keeps it."""
+    text = render_chat_prompt([{"role": "user", "content": "a\n\n"}], system=None)
+    assert parse_chat_prompt(text) == [{"role": "user", "content": "a\n\n"}]
