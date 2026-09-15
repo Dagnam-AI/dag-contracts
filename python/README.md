@@ -31,7 +31,7 @@ It is why the Pydantic registry that *authors* the schema stays out of the
 distribution — the wheel carries generated JSON and a plain-Python interpreter of
 it, and the typed authoring format lives in the repository instead.
 
-## Dataset hygiene and prompt rendering (Python-only)
+## Dataset hygiene and prompt rendering
 
 Since 0.2.0 the Python package also ships the dataset-hygiene primitives the
 platform and the `dagnam` SDK share — so a redaction, a dedup pass or a
@@ -43,7 +43,7 @@ Results are frozen dataclasses; everything is standard library only.
 ```python
 from dagnam_contracts import (
     apply_pii_policy, compute_exact_duplicates, compute_near_duplicates,
-    compute_split_overlap, render_chat_prompt, scan_rows,
+    compute_split_overlap, parse_chat_prompt, render_chat_prompt, scan_rows,
 )
 
 report = scan_rows(rows)                      # counts_by_code, issues, pass_list, disclaimer
@@ -53,12 +53,15 @@ compute_near_duplicates(rows, threshold=0.9).pairs
 compute_split_overlap({"train": train_rows, "test": test_rows}).has_contamination
 render_chat_prompt([{"role": "user", "content": "hi"}], system="Label it.")
 # '<|system|>\nLabel it.\n<|user|>\nhi\n'
+parse_chat_prompt("<|user|>\nhi\n")     # the inverse, for replaying a holdout
+# [{'role': 'user', 'content': 'hi'}]
 ```
 
 The PII scan is best-effort by contract: its result names the classes it looked
 for (`pass_list`) and carries a disclaimer, and nothing here ever reports data
-as "clean". These modules are Python-only; `@dagnam/contracts` (npm) carries the
-schema interpreter alone.
+as "clean". These modules are Python-only: `@dagnam/contracts` (npm) carries the
+schema interpreter plus, since 0.3.1, the audit's reference rows and serving rate
+card — the data a Studio displays, never the logic that computes a verdict.
 
 ## Versioning
 

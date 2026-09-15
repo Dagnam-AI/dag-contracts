@@ -16,8 +16,9 @@ Since 0.2.0 the package also carries the dataset-hygiene primitives (``hygiene``
 and the chat-prompt renderer (``prompts``); since 0.3.0, the workload-audit
 contract (``audit``) — the agreement scorers, the economics bands, the frontier
 rule, the serving rate card, the report's derived blocks and the open-model
-reference rows. All three are Python-only — the npm package ships the schema
-interpreter alone.
+reference rows. The logic is Python-only — the npm package ships the schema
+interpreter plus, since 0.3.1, the audit's reference rows and serving rate card,
+which a Studio displays rather than computes.
 """
 
 from __future__ import annotations

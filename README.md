@@ -87,13 +87,14 @@ forgotten recompile, or a Python/TypeScript copy that drifted from its twin all
 fail before a release can immortalize them. Conformance across the two
 interpreters is checked in the same workflow (`parity-across-languages`).
 
-## Dataset hygiene and prompt rendering (Python-only)
+## Dataset hygiene and prompt rendering
 
 Beyond the schema, the Python distribution carries the primitives that must give
 the *same answer* on the customer's machine and on a platform worker: `hygiene`
 (exact and near duplicates, split contamination, PII scan and redaction) and
-`prompts` (the chat-prompt renderer). The npm package ships the schema
-interpreter alone — none of this has a TypeScript consumer.
+`prompts` (the chat-prompt renderer and, since 0.3.1, the `parse_chat_prompt`
+inverse a holdout replay reads rendered rows back with). The npm package ships
+none of this logic — a browser never scores a holdout.
 
 Since 0.3.0 that list includes `audit`, the workload-audit contract. The SDK
 scores a holdout locally and the platform scores one on a worker, and a report
@@ -106,6 +107,18 @@ whole decision lives here: the agreement scorers (`score_labels`, `score_json`,
 models to compare against (`load_reference_models`). The reference rows are
 reference only — the audit never measures them — and each was checked against
 its Hugging Face model card on `REFERENCE_AS_OF`.
+
+Since 0.3.1 the two things a TypeScript consumer *displays* rather than computes
+ship in the npm package too: `open-models.json` and the serving rate card, typed
+off the package entry as `REFERENCE_MODELS` and `SERVING_RATES`. Both files are
+byte-identical to the wheel's and a test enforces it — unlike the schema nothing
+compiles them into place, so a hand edit on one side would otherwise let a
+Studio price an audit differently from the wheel that produced the report.
+
+0.3.1 also names the winning row in a report's `winner` block (`candidate_id`,
+null when the candidate has no id) instead of leaving readers to re-derive it
+from the kind, and gives a cancel receipt its own `dagnam.audit.cancelled/1`
+rather than reusing the delete schema with a different status word.
 
 ## Releasing
 
