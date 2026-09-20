@@ -31,3 +31,6 @@ coverage.json
 /python/htmlcov/
 /python/coverage.json
 /python/coverage.xml
+
+# macOS Finder metadata
+.DS_Store
