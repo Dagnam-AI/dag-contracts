@@ -8,10 +8,17 @@ the deployment cost planner's instance-hour prices, as
 - ``cpu-classifier``: a t3.medium at $0.0416/h serving a small encoder
   classifier at 20 requests/s sustained with 25% average utilization —
   ``0.0416 / (20 * 3600 * 0.25) * 1000 = 0.00231`` USD per 1k requests.
-- ``gpu-small-llm``: a g4dn.xlarge (one T4) at $0.526/h serving a
-  <=3B-parameter model at 300 output tokens/s aggregate with batching and 25%
-  average utilization — ``0.526 / (300 * 3600 * 0.25) * 1e6 = 1.948`` USD per
-  million output tokens.
+- ``gpu-small-llm``: one NVIDIA A10G on Modal -- the accelerator the platform's
+  vLLM deployments are rendered with and were confirmed live on
+  (mvp-backend ``modal_provider.py``, ``modal_vllm_app.py``) -- at Modal's list
+  price for the A10, $0.000306/s = $1.1016/h (https://modal.com/pricing, read
+  2026-09-27), serving a <=3B-parameter model at 300 output tokens/s aggregate
+  with batching and 25% average utilization —
+  ``1.1016 / (300 * 3600 * 0.25) * 1e6 = 4.080`` USD per million output tokens.
+  It priced a g4dn.xlarge T4 at $0.526/h (1.95) until 0.4.0, a machine the
+  platform never served on, so every GPU student looked about half as dear as
+  it is. Not included, and still understating it: the container's CPU and
+  memory (billed by Modal on top), prefill tokens, and an always-on replica.
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ StudentKind = Literal["cpu-classifier", "gpu-small-llm"]
 
 SERVING_RATES: Mapping[StudentKind, Mapping[str, float]] = {
     "cpu-classifier": {"usd_per_1k_requests": 0.0023},
-    "gpu-small-llm": {"usd_per_m_output_tokens": 1.95},
+    "gpu-small-llm": {"usd_per_m_output_tokens": 4.08},
 }
 """The two student kinds' estimated rates; the assumptions behind them are this module's docstring."""
 

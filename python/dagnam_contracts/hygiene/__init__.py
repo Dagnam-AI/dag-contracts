@@ -41,6 +41,7 @@ from dagnam_contracts.hygiene.pii import (
     PiiIssue,
     PiiScanResult,
     apply_pii_policy,
+    redact_json_text,
     scan_rows,
 )
 
@@ -69,6 +70,7 @@ __all__ = [
     "compute_split_overlap",
     "estimate_jaccard",
     "minhash_signature",
+    "redact_json_text",
     "row_text",
     "scan_rows",
     "shingles",

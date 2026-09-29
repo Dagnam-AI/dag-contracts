@@ -18,7 +18,7 @@ contract (``audit``) — the agreement scorers, the economics bands, the frontie
 rule, the serving rate card, the report's derived blocks and the open-model
 reference rows. The logic is Python-only — the npm package ships the schema
 interpreter plus, since 0.3.1, the audit's reference rows and serving rate card,
-which a Studio displays rather than computes.
+and since 0.4.0 the PII class names, which a Studio displays rather than computes.
 """
 
 from __future__ import annotations
@@ -32,6 +32,8 @@ from dagnam_contracts.audit import (
     FLOOR_JSON,
     FLOOR_LABEL,
     MAINTENANCE_USD_MONTH,
+    MIN_CLASS_RECALL_FLOOR,
+    MIN_CLASS_SUPPORT,
     MIN_HOLDOUT,
     MIN_TRACES_PER_WORKLOAD,
     RATIO_CANDIDATE,
@@ -88,6 +90,7 @@ from dagnam_contracts.hygiene import (
     compute_split_overlap,
     estimate_jaccard,
     minhash_signature,
+    redact_json_text,
     row_text,
     scan_rows,
     shingles,
@@ -116,6 +119,8 @@ __all__ = [
     "FLOOR_LABEL",
     "LAYER_TYPE_TO_COMPONENT",
     "MAINTENANCE_USD_MONTH",
+    "MIN_CLASS_RECALL_FLOOR",
+    "MIN_CLASS_SUPPORT",
     "MIN_HOLDOUT",
     "MIN_TRACES_PER_WORKLOAD",
     "NUM_PERMUTATIONS",
@@ -166,6 +171,7 @@ __all__ = [
     "normalize_label",
     "parse_chat_prompt",
     "ratio_status",
+    "redact_json_text",
     "render_chat_prompt",
     "render_switch_snippet",
     "row_text",

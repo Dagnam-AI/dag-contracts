@@ -1,6 +1,6 @@
 {
   "basis": "estimated",
-  "note": "Serving rates for the two student kinds, derived from the platform's deployment cost planner (USD per instance-hour: t3.medium 0.0416 and g4dn.xlarge 0.526). Labelled 'estimated' in every report until billing exists; measured latency is reported beside them. Formula: hourly_rate / (throughput_per_second * 3600 * utilization) * unit.",
+  "note": "Serving rates for the two student kinds, derived from instance-hour prices (USD per hour: t3.medium 0.0416 from the platform's deployment cost planner; one NVIDIA A10G on Modal 1.1016, Modal's list price for the A10 at 0.000306/s, https://modal.com/pricing, read 2026-09-27). Labelled 'estimated' in every report until billing exists; measured latency is reported beside them. Formula: hourly_rate / (throughput_per_second * 3600 * utilization) * unit.",
   "rates": {
     "cpu-classifier": {
       "usd_per_1k_requests": 0.0023,
@@ -8,9 +8,9 @@
       "assumptions": "t3.medium at $0.0416/h serving a small encoder classifier at 20 requests/s sustained with 25% average utilization: 0.0416 / (20 * 3600 * 0.25) * 1000 = 0.00231"
     },
     "gpu-small-llm": {
-      "usd_per_m_output_tokens": 1.95,
+      "usd_per_m_output_tokens": 4.08,
       "basis": "estimated",
-      "assumptions": "g4dn.xlarge (one T4) at $0.526/h serving a <=3B-parameter model at 300 output tokens/s aggregate with batching and 25% average utilization: 0.526 / (300 * 3600 * 0.25) * 1e6 = 1.948"
+      "assumptions": "one NVIDIA A10G on Modal (the accelerator the platform serves vLLM students on) at $1.1016/h serving a <=3B-parameter model at 300 output tokens/s aggregate with batching and 25% average utilization: 1.1016 / (300 * 3600 * 0.25) * 1e6 = 4.080. Excludes the container's CPU and memory, prefill tokens and an always-on replica."
     }
   }
 }
