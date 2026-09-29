@@ -70,3 +70,12 @@ export const DELETED_SCHEMA = "dagnam.audit.deleted/1";
  * two apart could not route on the schema id, which is what a schema id is for.
  */
 export const CANCELLED_SCHEMA = "dagnam.audit.cancelled/1";
+
+/**
+ * A label candidate must recall at least this share of every class with
+ * support; exact match alone passes a student that never predicts a rare class.
+ */
+export const MIN_CLASS_RECALL_FLOOR = 0.5;
+
+/** A class needs this many holdout rows before its recall counts toward the floor. */
+export const MIN_CLASS_SUPPORT = 5;

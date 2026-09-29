@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
+
+import pytest
 
 from dagnam_contracts.audit.report import (
     CANCELLED_SCHEMA,
@@ -13,6 +16,7 @@ from dagnam_contracts.audit.report import (
     switch_block,
     winner_of,
 )
+from dagnam_contracts.audit.scoring import score_labels
 
 CANDIDATES: list[dict[str, Any]] = [
     {
@@ -140,3 +144,186 @@ def test_winner_of_honours_a_candidates_recorded_floor() -> None:
     relaxed = winner_of(lenient, floor=0.95)
     assert relaxed is not None
     assert (relaxed["kind"], relaxed["cost_usd_month"]) == ("cheap", 5.0)
+
+
+def _row(kind: str, lo: float, cost: float, **extra: Any) -> dict[str, Any]:
+    """A scored candidate dict in the report's shape; ``floor`` goes on its agreement."""
+    agreement: dict[str, Any] = {"ci95": [lo, 1.0]}
+    if "floor" in extra:
+        agreement["floor"] = extra.pop("floor")
+    return {
+        "kind": kind,
+        "agreement": agreement,
+        "serving_cost_usd_month": {"value": cost},
+        **extra,
+    }
+
+
+def _both_orders(candidates: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+    return [winner_of(order, floor=0.97) for order in (candidates, candidates[::-1])]
+
+
+def test_an_unreliable_candidate_never_wins() -> None:
+    """C-F2: 200 of 1,000 replay calls failed and the 800 that answered all agreed.
+
+    Scored on the calls that answered, its lower bound (0.9952) clears 0.97 and
+    it is the cheaper row -- so on its numbers it wins, and the switch would
+    send a customer to an endpoint that failed one call in five. Its flag is the
+    only thing that keeps it out: the same row unflagged still wins.
+    """
+    flaky = _row("head_tune", 0.995221123794324, 5.0, unreliable=True, deployment_id="dep-flaky")
+    steady = _row("sft_small", 0.98, 40.0, unreliable=False, deployment_id="dep-steady")
+
+    assert winner_of([flaky], floor=0.97) is None
+    winner = winner_of([flaky, steady], floor=0.97)
+    assert winner is not None and winner["deployment_id"] == "dep-steady"
+    unflagged = winner_of([{**flaky, "unreliable": False}, steady], floor=0.97)
+    assert unflagged is not None and unflagged["deployment_id"] == "dep-flaky"
+
+
+def test_each_candidate_is_held_to_its_own_floor_whatever_the_order() -> None:
+    """C-F8(a): the floor used to be the LAST candidate's, so order picked the winner.
+
+    ``[sft 0.955@0.95, head 0.96@0.97]`` gave no winner and the reverse gave
+    ``head_tune``, which fails its own 0.97. Held to its own floor, ``sft_small``
+    passes and ``head_tune`` does not, in either order.
+    """
+    rows = [
+        _row("sft_small", 0.955, 10.0, floor=0.95, deployment_id="dep-sft"),
+        _row("head_tune", 0.96, 5.0, floor=0.97, deployment_id="dep-head"),
+    ]
+    assert [w and w["kind"] for w in _both_orders(rows)] == ["sft_small", "sft_small"]
+
+
+def test_the_winner_names_its_own_row_not_the_first_of_its_kind() -> None:
+    """C-F8(b): two ``head_tune`` rows, the CLI's and a Studio retrain, at one price.
+
+    The retrain's 0.99 wins; the block used to carry the CLI row's ids beside
+    it, so the switch pointed at a model that did not earn the verdict.
+    """
+    rows = [
+        _row("head_tune", 0.975, 5.0, deployment_id="dep-cli", candidate_id="cand-cli"),
+        _row("head_tune", 0.99, 5.0, deployment_id="dep-web", candidate_id="cand-web"),
+    ]
+    for winner in _both_orders(rows):
+        assert winner is not None
+        assert (winner["agreement_lo"], winner["deployment_id"], winner["candidate_id"]) == (
+            0.99,
+            "dep-web",
+            "cand-web",
+        )
+
+
+@pytest.mark.parametrize(
+    ("cli", "retrain"),
+    [
+        # A JSON workload at the default floors: the CLI row clears its own 0.95;
+        # the retrain was held to the header's 0.97 and is a hair cheaper.
+        (
+            _row("sft_small", 0.955, 2.4804, floor=0.95, candidate_id="cli"),
+            _row("sft_small", 0.965, 2.457, floor=0.97, candidate_id="web"),
+        ),
+        # short_span: a retrain priced at the CPU rate, far below the floor.
+        (
+            _row("sft_small", 0.98, 351.0, floor=0.97, candidate_id="cli"),
+            _row("sft_small", 0.90, 69.0, floor=0.97, candidate_id="web"),
+        ),
+        # Same floor, and the failing twin is one cent cheaper.
+        (
+            _row("head_tune", 0.99, 10.0, floor=0.97, candidate_id="cli"),
+            _row("head_tune", 0.50, 9.99, floor=0.97, candidate_id="web"),
+        ),
+    ],
+)
+def test_a_failing_cheaper_twin_never_hides_a_passing_row(
+    cli: dict[str, Any], retrain: dict[str, Any]
+) -> None:
+    """C-F1: every live row goes in, and the passing CLI row still wins.
+
+    The platform used to keep one row per kind BEFORE any floor was applied,
+    so the cheaper failing twin was kept and the workload read NOT YET.
+    """
+    for winner in _both_orders([cli, retrain]):
+        assert winner is not None and winner["candidate_id"] == "cli"
+
+
+def test_ties_break_on_certainty_then_on_the_ids() -> None:
+    """Order-independent all the way down: equal price, then the higher lower bound,
+    then ``candidate_id``, then ``kind``, then ``deployment_id``, all ascending."""
+    surer = [_row("b", 0.98, 5.0, candidate_id="z"), _row("a", 0.99, 5.0, candidate_id="y")]
+    assert [w and w["candidate_id"] for w in _both_orders(surer)] == ["y", "y"]
+
+    by_id = [_row("a", 0.99, 5.0, candidate_id="z"), _row("b", 0.99, 5.0, candidate_id="y")]
+    assert [w and w["candidate_id"] for w in _both_orders(by_id)] == ["y", "y"]
+
+    # The CLI's local rows carry no id; the kind decides, then the deployment.
+    by_kind = [_row("sft_small", 0.99, 5.0), _row("head_tune", 0.99, 5.0)]
+    assert [w and w["kind"] for w in _both_orders(by_kind)] == ["head_tune", "head_tune"]
+    by_dep = [
+        _row("head_tune", 0.99, 5.0, deployment_id="dep-2"),
+        _row("head_tune", 0.99, 5.0, deployment_id="dep-1"),
+    ]
+    assert [w and w["deployment_id"] for w in _both_orders(by_dep)] == ["dep-1", "dep-1"]
+
+
+def test_a_null_recorded_floor_falls_back_and_a_non_numeric_bound_is_no_point() -> None:
+    """``floor: null`` is no recorded floor, and a bound that is not a number is not a point."""
+    assert winner_of([_row("a", 0.96, 5.0, floor=None)], floor=0.95) is not None
+    assert winner_of([_row("a", 0.96, 5.0, floor=None)], floor=0.97) is None
+    unbounded = {**_row("a", 0.99, 5.0), "agreement": {"ci95": [None, 1.0]}}
+    assert winner_of([unbounded], floor=0.5) is None
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        _row("nan_lo", math.nan, 1.0),
+        _row("inf_lo", math.inf, 1.0),
+        _row("nan_floor", 0.10, 1.0, floor=math.nan),
+        _row("text_floor", 0.99, 1.0, floor="high"),
+        _row("nan_cost", 0.99, math.nan),
+        _row("inf_cost", 0.99, math.inf),
+    ],
+    ids=lambda row: row["kind"],
+)
+def test_a_non_finite_number_is_never_a_point(broken: dict[str, Any]) -> None:
+    """N3: NaN passed `lo < floor` (every comparison with NaN is False) and won,
+    and a NaN cost made the winner depend on the order of the list."""
+    sound = _row("sound", 0.98, 50.0)
+    assert winner_of([broken], floor=0.05) is None
+    for winner in _both_orders([broken, sound]):
+        assert winner is not None and winner["kind"] == "sound"
+
+
+def test_the_constant_majority_student_does_not_win() -> None:
+    """R2-1 end to end: the 1%-positive constant "ok" student's own agreement block
+    clears the 0.97 floor on exact match, and it must still not be the winner."""
+    truth = ["flag"] * 10 + ["ok"] * 990
+    constant = score_labels(["ok"] * 1000, truth).to_json()
+    detector = score_labels(["flag"] * 9 + ["ok"] * 991, truth).to_json()
+    rows = [
+        {
+            "kind": "head_tune",
+            "agreement": {**constant, "floor": 0.97},
+            "serving_cost_usd_month": {"value": 1.0},
+        },
+        {
+            "kind": "sft_small",
+            "agreement": {**detector, "floor": 0.97},
+            "serving_cost_usd_month": {"value": 9.0},
+        },
+    ]
+
+    assert winner_of(rows[:1], floor=0.97) is None
+    for winner in _both_orders(rows):
+        assert winner is not None and winner["kind"] == "sft_small"
+
+
+@pytest.mark.parametrize(
+    ("min_class_recall", "wins"),
+    [(None, True), (0.5, True), (0.49, False), (math.nan, False), ("high", False)],
+)
+def test_min_class_recall_gates_a_label_candidate(min_class_recall: object, wins: bool) -> None:
+    row = _row("head_tune", 0.99, 5.0)
+    row["agreement"]["min_class_recall"] = min_class_recall
+    assert (winner_of([row], floor=0.97) is not None) is wins

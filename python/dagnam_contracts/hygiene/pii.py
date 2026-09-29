@@ -15,9 +15,10 @@ it lives here, beside the detectors, so it cannot drift from what they do.
 records the measured per-class recall (and the misses, named), and is the
 thing to re-run before revisiting the choice. What it showed:
 
-* the four classes here are precisely the ones a pattern gets right — an
+* the classes here are precisely the ones a pattern gets right — an
   email, a card number and a US SSN are *syntactic*, and Luhn is a checksum,
-  not a guess;
+  not a guess; so is a credential with a provider's prefix or a PEM header
+  (`PII_SECRET`, whose finder and precision rules live in `credentials.py`);
 * presidio's advantage is entity types this scan does not claim (person
   names, addresses, locations), which need a NER model — i.e. an ML
   dependency, which this deliberately dependency-free package cannot carry;
@@ -27,6 +28,18 @@ thing to re-run before revisiting the choice. What it showed:
 Adding a class means adding a `PiiDetector` to `PII_DETECTORS` — never an
 ``if class == ...`` branch in a task or a router, same rule the format
 registry states.
+
+A string that holds a JSON object or array is read value by value, by the
+scan and the redaction alike: a card number that was a JSON number is redacted
+to a JSON string rather than a bare placeholder no parser accepts, and a
+member whose key names a credential is a `PII_SECRET` -- under an unambiguous
+name (`{"password": ...}`) whatever its value, under `token`, `authorization`,
+`auth` or `key` only when the value is a credential on its own
+(`credentials.py` has the rule). A redacted document is re-serialised with `json.dumps`
+defaults, so its spacing, duplicate keys and float spelling are normalised,
+and two keys redacted to one placeholder collide (the later value wins). A
+document that does not parse, or nests too deep to walk, is read as plain
+text. `redact_json_text` is the same path for a caller holding JSON text.
 
 Findings are `PiiIssue`-shaped on purpose — the same ``row_index`` / ``code``
 / ``message`` / ``severity`` record a row-level format issue uses, so a report
@@ -38,9 +51,17 @@ Pure — no session, no I/O.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
-import re
+import json
 from typing import TYPE_CHECKING, Any, Literal
+
+from dagnam_contracts.hygiene.detectors import (
+    PII_CODES,
+    PII_DETECTORS,
+    REDACTION_TEMPLATE,
+    PiiDetector,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
@@ -56,109 +77,7 @@ PII_DISCLAIMER = (
 
 PiiAction = Literal["redact", "drop", "ignore"]
 
-REDACTION_TEMPLATE = "[REDACTED:{code}]"
-
-
-def _luhn_ok(digits: str) -> bool:
-    """Standard Luhn check over a digit string."""
-    total = 0
-    for position, char in enumerate(reversed(digits)):
-        value = int(char)
-        if position % 2:
-            value *= 2
-            if value > 9:
-                value -= 9
-        total += value
-    return total % 10 == 0
-
-
-_CARD_CANDIDATE = re.compile(r"(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])")
-
-
-def _find_payment_cards(text: str) -> list[tuple[int, int]]:
-    """Spans of 13-19 digit runs that pass Luhn.
-
-    The Luhn check is what makes this class worth shipping: without it, every
-    order id and phone number in the dataset is a false positive, and a scan
-    that cries wolf gets switched off.
-    """
-    spans: list[tuple[int, int]] = []
-    for match in _CARD_CANDIDATE.finditer(text):
-        digits = re.sub(r"[ -]", "", match.group())
-        if 13 <= len(digits) <= 19 and _luhn_ok(digits):
-            spans.append(match.span())
-    return spans
-
-
-# Not preceded by a digit, a `+`, or a digit-then-separator: the last of the
-# three is what stops a 16-digit card number from yielding a 12-digit "phone"
-# starting at its second group.
-# `(?![\d]|[ -]\d)` is the important half: without it the pattern backtracks
-# out of a 16-digit card number and reports its first 12 digits as a phone.
-_PHONE_CANDIDATE = re.compile(r"(?<![\d+])(?<![\d][ -])\+?\d(?:[\d\s.()-]{7,20})\d(?![\d]|[ -]\d)")
-
-
-def _find_phones(text: str) -> list[tuple[int, int]]:
-    """Spans that look like a dialable number rather than a long id.
-
-    Filters on top of the pattern, each removing a false positive the corpus
-    actually produced: a leading ``+`` admits 9-15 digits, without one the
-    floor rises to 10 (which is what stops a dashed 9-digit US SSN reading as
-    a phone number); at least one separator or a leading ``+`` is required (a
-    bare digit run is an order id far more often than a phone number); and no
-    trailing digit, so a 23-digit id cannot yield a 14-digit "phone" from its
-    prefix.
-    """
-    spans: list[tuple[int, int]] = []
-    for match in _PHONE_CANDIDATE.finditer(text):
-        raw = match.group()
-        digits = re.sub(r"\D", "", raw)
-        international = raw.startswith("+")
-        if not (9 if international else 10) <= len(digits) <= 15:
-            continue
-        if not international and not re.search(r"[\s.()-]", raw):
-            continue
-        spans.append(match.span())
-    return spans
-
-
-def _regex_finder(pattern: re.Pattern[str]) -> Callable[[str], list[tuple[int, int]]]:
-    def _find(text: str) -> list[tuple[int, int]]:
-        return [match.span() for match in pattern.finditer(text)]
-
-    return _find
-
-
-@dataclass(frozen=True)
-class PiiDetector:
-    """One finding class: what it is called, and how to locate it in text."""
-
-    code: str
-    label: str
-    find: Callable[[str], list[tuple[int, int]]]
-
-
-PII_DETECTORS: tuple[PiiDetector, ...] = (
-    PiiDetector(
-        code="PII_EMAIL",
-        label="Email address",
-        find=_regex_finder(re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
-    ),
-    PiiDetector(code="PII_PHONE", label="Phone number", find=_find_phones),
-    PiiDetector(code="PII_PAYMENT_CARD", label="Payment card number", find=_find_payment_cards),
-    PiiDetector(
-        code="PII_NATIONAL_ID",
-        label="National identifier (US SSN)",
-        # The area/group/serial rules are part of the pattern: 000/666/9xx
-        # areas and 00 groups / 0000 serials are never issued, and excluding
-        # them is what keeps ordinary 9-digit ids out of the results.
-        find=_regex_finder(
-            re.compile(r"(?<![\d-])(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}(?![\d-])")
-        ),
-    ),
-)
-
-PII_CODES: tuple[str, ...] = tuple(detector.code for detector in PII_DETECTORS)
+_ALL_CODES = set(PII_CODES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,31 +131,32 @@ def _walk_strings(value: Any, path: str = "") -> Iterator[tuple[str, str]]:
             yield from _walk_strings(item, f"{path}[{index}]")
 
 
-def _map_strings(value: Any, transform: Callable[[str], tuple[str, int]]) -> tuple[Any, int]:
+def _map_strings(
+    value: Any, transform: Callable[[str], tuple[str, Counter[str]]]
+) -> tuple[Any, Counter[str]]:
     """Rebuild `value` with `transform` applied to every string inside it.
 
     The write-side mirror of `_walk_strings` — same traversal, so anything the
     scan can report is something the redactor can actually rewrite. Returns
-    the new value and how many replacements were made.
+    the new value and the findings per class.
     """
     if isinstance(value, str):
         return transform(value)
+    total: Counter[str] = Counter()
     if isinstance(value, dict):
         rebuilt: dict[Any, Any] = {}
-        total = 0
         for key, item in value.items():
-            rebuilt[key], count = _map_strings(item, transform)
-            total += count
+            rebuilt[key], found = _map_strings(item, transform)
+            total += found
         return rebuilt, total
     if isinstance(value, list):
         items: list[Any] = []
-        total = 0
         for item in value:
-            new_item, count = _map_strings(item, transform)
+            new_item, found = _map_strings(item, transform)
             items.append(new_item)
-            total += count
+            total += found
         return items, total
-    return value, 0
+    return value, total
 
 
 def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResult:
@@ -251,18 +171,19 @@ def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResul
 
     for row_index, row in enumerate(rows):
         for field_path, text in _walk_strings(row):
+            _, found = _findings(text, _ALL_CODES)
             for detector in PII_DETECTORS:
-                found = detector.find(text)
-                if not found:
+                matched = found[detector.code]
+                if not matched:
                     continue
-                counts[detector.code] += len(found)
+                counts[detector.code] += matched
                 if len(issues) < max_issues:
                     issues.append(
                         PiiIssue(
                             row_index=row_index,
                             code=detector.code,
                             message=(
-                                f"{detector.label} matched {len(found)} time(s) in field {field_path!r}"
+                                f"{detector.label} matched {matched} time(s) in field {field_path!r}"
                             ),
                             severity="warning",
                         )
@@ -276,22 +197,127 @@ def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResul
     )
 
 
-def _redact_text(text: str, codes: set[str]) -> tuple[str, int]:
-    """Replace every span the named detectors match, right-to-left."""
-    spans: list[tuple[int, int, str]] = []
-    for detector in PII_DETECTORS:
-        if detector.code in codes:
-            spans.extend((start, end, detector.code) for start, end in detector.find(text))
-    if not spans:
-        return text, 0
+def _redact_text(text: str, codes: set[str]) -> tuple[str, Counter[str]]:
+    """``text`` with every span the named detectors match replaced; the findings per class.
 
-    # Right-to-left so an earlier replacement cannot shift a later span's
-    # offsets; overlapping matches from two detectors are applied
-    # outermost-first and the inner one then finds nothing to move.
-    redacted = text
-    for start, end, code in sorted(spans, reverse=True):
-        redacted = redacted[:start] + REDACTION_TEMPLATE.format(code=code) + redacted[end:]
-    return redacted, len(spans)
+    Overlapping findings (an email inside a password value, a phone pattern
+    over an IP address) are one region over their union, replaced once --
+    replacing each in turn would cut the text at offsets the first replacement
+    already moved -- and counted once, under the earliest finder that is not
+    `PiiDetector.loose`.
+    """
+    hits = sorted(
+        (
+            (start, end, detector)
+            for detector in PII_DETECTORS
+            if detector.code in codes
+            for start, end in detector.find(text)
+        ),
+        key=lambda hit: (hit[0], hit[1]),
+    )
+    regions: list[tuple[int, int, PiiDetector]] = []
+    for start, end, detector in hits:
+        if regions and start < regions[-1][1]:
+            first, last, named = regions[-1]
+            regions[-1] = (first, max(last, end), detector if named.loose else named)
+        else:
+            regions.append((start, end, detector))
+    pieces: list[str] = []
+    cursor = 0
+    for start, end, detector in regions:
+        pieces += (text[cursor:start], detector.replacement)
+        cursor = end
+    pieces.append(text[cursor:])
+    return "".join(pieces), Counter(detector.code for _, _, detector in regions)
+
+
+def _member_text(value: Any) -> str | None:
+    """A JSON member's value as text when it is a string or a number, else ``None``."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return json.dumps(value)
+    return None
+
+
+def _redact_member(key: str, value: Any, codes: set[str]) -> tuple[Any, Counter[str]]:
+    """One member's value: whole, when a class finds it by its key; else like any value."""
+    text = _member_text(value)
+    for detector in PII_DETECTORS:
+        if (
+            text is not None
+            and detector.member is not None
+            and detector.code in codes
+            and detector.member(key, text)
+        ):
+            return detector.replacement, Counter({detector.code: 1})
+    return _redact_json_value(value, codes)
+
+
+def _redact_json_value(value: Any, codes: set[str]) -> tuple[Any, Counter[str]]:
+    """`value` with every string, key and number inside it redacted; the findings per class.
+
+    A number that matched is replaced by the redacted text of it, a JSON
+    string -- the placeholder is text, and a bare one is not JSON.
+    """
+    text = _member_text(value)
+    if text is not None:
+        redacted, found = _redact_text(text, codes)
+        return (redacted if found or isinstance(value, str) else value), found
+    total: Counter[str] = Counter()
+    if isinstance(value, list):
+        items: list[Any] = []
+        for item in value:
+            new_item, found = _redact_json_value(item, codes)
+            items.append(new_item)
+            total += found
+        return items, total
+    if isinstance(value, dict):
+        rebuilt: dict[str, Any] = {}
+        for key, item in value.items():
+            new_key, key_found = _redact_text(key, codes)
+            rebuilt[new_key], found = _redact_member(key, item, codes)
+            total += key_found + found
+        return rebuilt, total
+    return value, total
+
+
+def _redact_document(text: str, value: Any, codes: set[str]) -> tuple[str, Counter[str]]:
+    """``text``, which parsed to ``value``, redacted and re-serialised only if it changed."""
+    redacted, found = _redact_json_value(value, codes)
+    return (json.dumps(redacted, ensure_ascii=False) if found else text), found
+
+
+def _findings(text: str, codes: set[str]) -> tuple[str, Counter[str]]:
+    """One string of a row, redacted for ``codes``, and what was found per class.
+
+    Only a document that opens with ``{`` or ``[`` is read as JSON: a field of
+    plain text that happens to parse as a number is still plain text. One that
+    does not parse, or nests deeper than the parser or the walk can go
+    (``RecursionError``), is read as plain text -- never a crash.
+    """
+    if text.lstrip()[:1] in ("{", "["):
+        try:
+            return _redact_document(text, json.loads(text), codes)
+        except (ValueError, RecursionError):
+            pass
+    return _redact_text(text, codes)
+
+
+def redact_json_text(text: str) -> tuple[str, int]:
+    """Redact every PII class in JSON ``text`` and keep it JSON; ``(text, findings)``.
+
+    Every string, key and number is redacted where it stands, and the value
+    of a member whose key names a credential is replaced whole, so the result
+    parses to the same shape; a number that matched becomes a JSON string.
+    Text with nothing to redact comes back byte for byte. Text that is not
+    JSON, or nests too deep to walk, is redacted as plain text.
+    """
+    try:
+        redacted, found = _redact_document(text, json.loads(text), _ALL_CODES)
+    except (ValueError, RecursionError):
+        redacted, found = _redact_text(text, _ALL_CODES)
+    return redacted, sum(found.values())
 
 
 def apply_pii_policy(
@@ -319,12 +345,7 @@ def apply_pii_policy(
     rows_removed = 0
 
     for row in rows:
-        if drop_codes and any(
-            detector.find(text)
-            for _, text in _walk_strings(row)
-            for detector in PII_DETECTORS
-            if detector.code in drop_codes
-        ):
+        if drop_codes and any(_findings(text, drop_codes)[1] for _, text in _walk_strings(row)):
             rows_removed += 1
             continue
 
@@ -332,8 +353,8 @@ def apply_pii_policy(
             kept.append(row)
             continue
 
-        new_row, replacements = _map_strings(row, lambda text: _redact_text(text, redact_codes))
-        rows_changed += int(replacements > 0)
+        new_row, found = _map_strings(row, lambda text: _findings(text, redact_codes))
+        rows_changed += int(bool(found))
         kept.append(new_row)
 
     return kept, rows_changed, rows_removed
@@ -349,5 +370,6 @@ __all__ = [
     "PiiIssue",
     "PiiScanResult",
     "apply_pii_policy",
+    "redact_json_text",
     "scan_rows",
 ]

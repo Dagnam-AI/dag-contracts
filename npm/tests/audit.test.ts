@@ -13,6 +13,8 @@ import { describe, expect, it } from "vitest";
 import {
   CANCELLED_SCHEMA,
   DELETED_SCHEMA,
+  MIN_CLASS_RECALL_FLOOR,
+  MIN_CLASS_SUPPORT,
   REFERENCE_AS_OF,
   REFERENCE_MODELS,
   REPORT_SCHEMA,
@@ -43,8 +45,9 @@ describe("serving rates", () => {
     expect(SERVING_RATES.rates["cpu-classifier"].usd_per_1k_requests).toBe(
       0.0023,
     );
+    // An A10G on Modal, the machine that serves (R2-6); it priced a T4 at 1.95.
     expect(SERVING_RATES.rates["gpu-small-llm"].usd_per_m_output_tokens).toBe(
-      1.95,
+      4.08,
     );
     for (const row of Object.values(SERVING_RATES.rates)) {
       expect(row.basis).toBe("estimated");
@@ -59,5 +62,12 @@ describe("audit artifact schema ids", () => {
     expect(DELETED_SCHEMA).toBe("dagnam.audit.deleted/1");
     expect(CANCELLED_SCHEMA).toBe("dagnam.audit.cancelled/1");
     expect(CANCELLED_SCHEMA).not.toBe(DELETED_SCHEMA);
+  });
+});
+
+describe("label class-recall floor", () => {
+  it("ships the contract's floor and support threshold", () => {
+    expect(MIN_CLASS_RECALL_FLOOR).toBe(0.5);
+    expect(MIN_CLASS_SUPPORT).toBe(5);
   });
 });

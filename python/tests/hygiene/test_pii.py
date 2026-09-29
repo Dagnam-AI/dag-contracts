@@ -12,12 +12,17 @@ the same honesty the feature's UI copy promises.
 
 from __future__ import annotations
 
+from pathlib import Path
+import re
+import time
+
 import pytest
 
 from dagnam_contracts.hygiene.pii import (
     PII_CODES,
+    PII_DETECTORS,
     PII_DISCLAIMER,
-    _luhn_ok,
+    PiiAction,
     apply_pii_policy,
     scan_rows,
 )
@@ -46,6 +51,28 @@ LABELLED_CORPUS: list[tuple[str, set[str]]] = [
     ("ssn: 078-05-1120", {"PII_NATIONAL_ID"}),
     ("ssn 123456789 unformatted", {"PII_NATIONAL_ID"}),  # undashed: a known miss
     ("invalid ssn 000-12-3456", set()),
+    # --- secret (every pattern has its own positive and near-miss in
+    # tests/hygiene/test_credentials.py; these are the everyday shapes) ---
+    ("Authorization: Bearer " + "a1B2c3D4e5F6g7H8i9J0k1L2", {"PII_SECRET"}),
+    ("export OPENAI_API_KEY=" + "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3", {"PII_SECRET"}),
+    ("db password: hunter2", {"PII_SECRET"}),
+    # A secret with no recognisable shape, assigned to nothing: a known miss.
+    ("the vault combination is correcthorsebatterystaple", {"PII_SECRET"}),
+    ("commit da39a3ee5e6b4b0d3255bfef95601890afd80709", set()),
+    # --- R3-08 classes (each has its own positives and near-misses in
+    # tests/hygiene/test_detectors.py; these are the everyday shapes) ---
+    ("refund to DE89 3704 0044 0532 0130 00 please", {"PII_IBAN"}),
+    ("wire to GB29NWBK60161331926819", {"PII_IBAN"}),
+    ("login from 203.0.113.9 failed", {"PII_IP_ADDRESS"}),
+    ("DOB: 14/03/1987", {"PII_DATE_OF_BIRTH"}),
+    # A date of birth with no birth keyword before it: a known miss.
+    ("Jane (14 March 1987) called", {"PII_DATE_OF_BIRTH"}),
+    ("NI number AB 12 34 56 C", {"PII_UK_NINO"}),
+    ("SIN 130 692 544", {"PII_CA_SIN"}),
+    ("Aadhaar 2345 6789 0124", {"PII_IN_AADHAAR"}),
+    ("PAN ABCPE1234F", {"PII_IN_PAN"}),
+    ("VAT DE123456789", {"PII_EU_VAT"}),
+    ("release v1.2.3.4 of 2.10.3, date 2026-08-16", set()),
     # --- mixed / negative ---
     (
         "email bob@corp.io or call +44 20 7946 0958",
@@ -59,17 +86,30 @@ KNOWN_MISSES = {
     "obfuscated email (`J DOT SMITH AT example DOT com`)",
     "undashed 9-digit SSN (indistinguishable from an order id without context)",
     "person names, street addresses, locations — never claimed; they need NER",
+    "a bare secret with no provider shape and no `password:`-style name before it",
+    "a date of birth with no birth keyword before it",
 }
 
 # Floors, measured against LABELLED_CORPUS at the time the detectors landed.
 # A ratchet: raise one when a detector genuinely improves, never lower one.
 # Measured: email 3/4 (obfuscated form missed), phone 4/4, card 3/3,
-# national id 2/3 (undashed form missed). Not 1.0, and deliberately so.
+# national id 2/3 (undashed form missed), secret 3/4 (bare passphrase missed),
+# date of birth 1/2 (no keyword missed), every other class 1/1 or 2/2.
+# Not 1.0, and deliberately so.
 RECALL_FLOOR = {
     "PII_EMAIL": 3 / 4,
     "PII_PHONE": 4 / 4,
     "PII_PAYMENT_CARD": 3 / 3,
     "PII_NATIONAL_ID": 2 / 3,
+    "PII_SECRET": 3 / 4,
+    "PII_IBAN": 2 / 2,
+    "PII_IP_ADDRESS": 1 / 1,
+    "PII_DATE_OF_BIRTH": 1 / 2,
+    "PII_UK_NINO": 1 / 1,
+    "PII_CA_SIN": 1 / 1,
+    "PII_IN_AADHAAR": 1 / 1,
+    "PII_IN_PAN": 1 / 1,
+    "PII_EU_VAT": 1 / 1,
 }
 
 
@@ -118,16 +158,6 @@ class TestLabelledCorpus:
         assert len(positives) >= 8
         assert len(negatives) >= 4
         assert KNOWN_MISSES  # the boundary is written down, not implied
-
-
-class TestLuhn:
-    @pytest.mark.parametrize("digits", ["4111111111111111", "378282246310005", "5555555555554444"])
-    def test_valid_card_numbers_pass(self, digits: str) -> None:
-        assert _luhn_ok(digits) is True
-
-    @pytest.mark.parametrize("digits", ["4111111111111112", "1234567890123456"])
-    def test_invalid_card_numbers_fail(self, digits: str) -> None:
-        assert _luhn_ok(digits) is False
 
 
 class TestScanRows:
@@ -257,3 +287,75 @@ class TestApplyPiiPolicy:
 
         assert kept[0]["messages"] == []
         assert changed == 1
+
+
+_KEY = "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3"
+
+
+class TestSecretClass:
+    def test_secret_is_a_class_every_redact_everything_policy_covers(self) -> None:
+        """The audit builds its policy as every class -> redact, so the new
+        class is covered there with no change on the consumer's side."""
+        assert "PII_SECRET" in PII_CODES
+        rows = [{"system": f"Auth header: Bearer {_KEY}. Be polite."}]
+
+        kept, changed, _ = apply_pii_policy(rows, dict.fromkeys(PII_CODES, "redact"))
+
+        assert kept == [{"system": "Auth header: Bearer <SECRET>. Be polite."}]
+        assert changed == 1
+
+    def test_a_secret_is_counted_and_named_by_the_scan(self) -> None:
+        result = scan_rows([{"a": f"key={_KEY}"}])
+
+        assert result.counts_by_code["PII_SECRET"] == 1
+        assert "PII_SECRET" in result.pass_list
+        (issue,) = result.issues
+        assert issue.message.startswith("Secret or credential matched 1 time(s)")
+
+    def test_only_the_secret_class_reads_as_the_secret_placeholder(self) -> None:
+        placeholders = {d.code: d.placeholder for d in PII_DETECTORS}
+        assert placeholders.pop("PII_SECRET") == "<SECRET>"
+        assert set(placeholders.values()) == {None}
+
+    def test_a_finding_inside_another_is_replaced_once(self) -> None:
+        """An email inside a password value is two findings over one span.
+
+        Replacing both right-to-left used the outer span's stale offsets once
+        the inner one had moved the text, and left `D:PII_EMAIL]` behind.
+        """
+        rows = [{"a": "password=pre#x1@y.com end"}]
+
+        kept, changed, _ = apply_pii_policy(rows, dict.fromkeys(PII_CODES, "redact"))
+
+        assert kept == [{"a": "password=<SECRET> end"}]
+        assert changed == 1
+
+
+def test_the_npm_package_names_the_same_classes_in_the_same_order() -> None:
+    """The Studio types its PII label map against `PiiCode`; a class added here
+    must reach that union, or the new class renders as a raw code."""
+    npm = Path(__file__).resolve().parents[3] / "npm" / "src" / "pii.ts"
+    assert tuple(re.findall(r'"(PII_[A-Z_]+)"', npm.read_text())) == PII_CODES
+
+
+_ALL: dict[str, PiiAction] = dict.fromkeys(PII_CODES, "redact")
+
+
+class TestLinearTime:
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "a" * 100_000,
+            # A base64 image in a vision chat message: one long run, no `@`.
+            "data:image/png;base64," + ("iVBORw0KGgoAAAANSUhEUgAA+/" * 4_000),
+            "a." * 50_000,
+            "x@" + "b" * 100_000,
+        ],
+        ids=["letters", "base64", "dotted", "no-dot-domain"],
+    )
+    def test_a_100_kb_row_scans_in_well_under_a_second(self, text: str) -> None:
+        """The email pattern had no left boundary: 100 KB with no `@` took 18.3 s."""
+        started = time.perf_counter()
+        scan_rows([{"a": text}])
+        apply_pii_policy([{"a": text}], _ALL)
+        assert time.perf_counter() - started < 2.0

@@ -120,6 +120,11 @@ null when the candidate has no id) instead of leaving readers to re-derive it
 from the kind, and gives a cancel receipt its own `dagnam.audit.cancelled/1`
 rather than reusing the delete schema with a different status word.
 
+0.4.0 adds a `PII_SECRET` class for credentials, keeps a redacted JSON
+document valid JSON, holds each audit candidate to its own floor and never
+lets an unreliable one win, and ships the PII class names to npm as
+`PII_CODES` / `PiiCode`. `CHANGELOG.md` has the details.
+
 ## Releasing
 
 One tag publishes both packages from one source, so they can never be published

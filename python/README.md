@@ -61,7 +61,17 @@ The PII scan is best-effort by contract: its result names the classes it looked
 for (`pass_list`) and carries a disclaimer, and nothing here ever reports data
 as "clean". These modules are Python-only: `@dagnam/contracts` (npm) carries the
 schema interpreter plus, since 0.3.1, the audit's reference rows and serving rate
-card — the data a Studio displays, never the logic that computes a verdict.
+card, and since 0.4.0 the PII class names — the data a Studio displays, never the
+logic that computes a verdict.
+
+Since 0.4.0 the scan also finds credentials (`PII_SECRET`: provider keys, JWTs,
+PEM private keys, `Bearer` tokens, `password=`-style assignments and the value of
+a JSON key named like a credential), redacted as `<SECRET>`, and redaction keeps
+JSON valid: a JSON object or array inside a row, or the text handed to
+`redact_json_text`, is read and redacted value by value.
+0.4.0 also finds IBANs, IP addresses, dates of birth (beside a birth keyword),
+UK NINOs, Canadian SINs, Indian Aadhaar and PAN numbers and EU VAT numbers,
+each checksum-, parser-, format- or keyword-backed and under its own code.
 
 ## Versioning
 

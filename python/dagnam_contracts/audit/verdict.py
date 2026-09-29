@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+import math
 from typing import Literal
 
 RATIO_NOT_WORTH_IT = 3.0
@@ -28,6 +29,15 @@ DAYS_PER_MONTH = 30
 """Monthly figures are per-day rates times this."""
 UNRELIABLE_ERROR_SHARE = 0.10
 """A replay whose error share exceeds this is scored as unreliable."""
+MIN_CLASS_RECALL_FLOOR = 0.5
+"""A label candidate must recall at least this share of every class with support.
+
+Exact match alone passes a student that never predicts a rare class: on a
+1%-positive holdout, always answering the majority scores 0.99 with a lower
+bound above the 0.97 floor. This is the second criterion that refuses it.
+"""
+MIN_CLASS_SUPPORT = 5
+"""A class needs this many holdout rows before its recall counts toward the floor."""
 
 VerdictStatus = Literal[
     "candidate", "marginal", "not_worth_it", "not_audited", "too_few_samples", "unknown_cost"
@@ -60,6 +70,8 @@ class CandidateResult:
     ci: tuple[float, float]
     cost_usd_month: float
     p95_ms: float | None
+    min_class_recall: float | None = None
+    """A label score's worst per-class recall; ``None`` for JSON, or when no class has support."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,11 +84,28 @@ class Winner:
 
 
 def frontier(points: Sequence[CandidateResult], *, floor: float) -> Winner | None:
-    """The cheapest point whose interval's lower bound clears ``floor``; ties to the more certain."""
-    passing = [p for p in points if p.ci[0] >= floor]
+    """The cheapest point whose interval's lower bound clears ``floor``.
+
+    Ties go to the more certain point, then to ``kind`` ascending, so the choice
+    never depends on the order of ``points``; a point whose cost or lower bound
+    is not finite is never chosen, nor one whose ``min_class_recall`` is below
+    :data:`MIN_CLASS_RECALL_FLOOR`. This is the bare rule over bare points, one
+    floor for all of them. A report's winner is
+    :func:`~dagnam_contracts.audit.report.winner_of`, which also holds each
+    candidate to its own floor, skips unreliable ones and breaks ties on the
+    candidate's ids.
+    """
+    passing = [
+        p
+        for p in points
+        if math.isfinite(p.cost_usd_month)
+        and math.isfinite(p.ci[0])
+        and p.ci[0] >= floor
+        and (p.min_class_recall is None or p.min_class_recall >= MIN_CLASS_RECALL_FLOOR)
+    ]
     if not passing:
         return None
-    best = min(passing, key=lambda p: (p.cost_usd_month, -p.ci[0]))
+    best = min(passing, key=lambda p: (p.cost_usd_month, -p.ci[0], p.kind))
     return Winner(kind=best.kind, cost_usd_month=best.cost_usd_month, agreement_lo=best.ci[0])
 
 
@@ -85,6 +114,8 @@ __all__ = [
     "FLOOR_JSON",
     "FLOOR_LABEL",
     "MAINTENANCE_USD_MONTH",
+    "MIN_CLASS_RECALL_FLOOR",
+    "MIN_CLASS_SUPPORT",
     "MIN_HOLDOUT",
     "MIN_TRACES_PER_WORKLOAD",
     "RATIO_CANDIDATE",

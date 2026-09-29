@@ -11,12 +11,16 @@ import schema from "./component-schema.json" with { type: "json" };
 export {
   CANCELLED_SCHEMA,
   DELETED_SCHEMA,
+  MIN_CLASS_RECALL_FLOOR,
+  MIN_CLASS_SUPPORT,
   REFERENCE_AS_OF,
   REFERENCE_MODELS,
   REPORT_SCHEMA,
   SERVING_RATES,
 } from "./audit.js";
 export type { ReferenceModel, ServingRate, ServingRateCard } from "./audit.js";
+export { PII_CODES } from "./pii.js";
+export type { PiiCode } from "./pii.js";
 export { validateParamsAgainstSchema } from "./schema-param-validation.js";
 export { isParamApplicable, paramIsInteger } from "./component-schema-fields.js";
 export type { Severity, ValidationResult } from "./types.js";
