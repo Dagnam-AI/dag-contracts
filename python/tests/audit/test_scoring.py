@@ -89,7 +89,7 @@ class TestScoreLabels:
         }
 
     def test_a_constant_majority_student_has_zero_minority_recall(self) -> None:
-        """R2-1: 1% positives, and a student that always answers the majority.
+        """1% positives, and a student that always answers the majority.
 
         Exact match is 0.99 with a lower bound that clears the 0.97 floor; the
         minority class's recall is 0, which is what the frontier now refuses.
@@ -140,7 +140,7 @@ class TestScoreJson:
         assert modal_keys(["nope"]) == []
 
     def test_one_row_is_one_observation_however_many_fields_it_holds(self) -> None:
-        """C-F9: the interval counted every correct field as two independent trials.
+        """The interval counted every correct field as two independent trials.
 
         One row with one correct field came out at lo 0.342 against 0.207 for
         the same single observation scored as a label, and a row of ten correct
@@ -163,7 +163,7 @@ class TestScoreJson:
         assert agreement.ci95[0] < wilson_interval(4, 7)[0]
 
     def test_a_json_block_carries_no_min_class_recall(self) -> None:
-        """Q4 is a label criterion; the JSON agreement block is unchanged."""
+        """Class recall is a label criterion; the JSON agreement block is unchanged."""
         js = score_json(['{"a": 1}'], ['{"a": 1}'], ["a"]).to_json()
         assert "min_class_recall" not in js
         assert js["metric"] == "field_f1"
@@ -187,7 +187,7 @@ def _dump(value: object) -> str:
 
 
 class TestScoreToolCalls:
-    """P4b: a truth that is a tool call is scored per row, name first."""
+    """A truth that is a tool call is scored per row, name first."""
 
     def test_a_router_that_misroutes_7_percent_does_not_clear_the_json_floor(self) -> None:
         """Every call carries ``{}`` arguments, so field-F1 over ``name`` and
@@ -244,7 +244,7 @@ class TestScoreToolCalls:
     @pytest.mark.parametrize(
         ("pred", "truth", "score"),
         [
-            # R4: an agent that sometimes answers in text; the text is scored as text.
+            # An agent that sometimes answers in text; the text is scored as text.
             ("Sure, it is done.", "Sure, it is done.", 1.0),
             ("sure, it is done", "Sure, it is done.", 1.0),
             ("It failed.", "Sure, it is done.", 0.0),

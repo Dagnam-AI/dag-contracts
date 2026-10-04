@@ -43,10 +43,11 @@ def _sub(entry: Mapping[str, Any], key: str) -> Mapping[str, Any]:
 def _point(candidate: Mapping[str, Any], default_floor: float) -> tuple[float, float] | None:
     """``(cost, agreement lower bound)`` when ``candidate`` may win, else ``None``.
 
-    It may win only when it is priced, has a finite lower bound that clears
-    its OWN recorded ``agreement.floor`` (``default_floor`` when it recorded
-    none), and is not flagged ``unreliable``. A recorded floor that is not a
-    finite number is a malformed row, never a pass. A label candidate whose
+    It may win only when it is priced at zero or more, has a finite lower bound
+    that clears its OWN recorded ``agreement.floor`` (``default_floor`` when it
+    recorded none), and is not flagged ``unreliable``. A negative cost is a
+    malformed row that would always be the cheapest, and a recorded floor that
+    is not a finite number is one too, never a pass. A label candidate whose
     ``agreement.min_class_recall`` is below
     :data:`~dagnam_contracts.audit.verdict.MIN_CLASS_RECALL_FLOOR` -- it misses
     a whole class the exact-match score hides -- is refused the same way.
@@ -56,7 +57,7 @@ def _point(candidate: Mapping[str, Any], default_floor: float) -> tuple[float, f
     agreement = _sub(candidate, "agreement")
     cost = _number(_sub(candidate, "serving_cost_usd_month").get("value"))
     ci = agreement.get("ci95")
-    if cost is None or not isinstance(ci, list) or len(ci) != 2:
+    if cost is None or cost < 0 or not isinstance(ci, list) or len(ci) != 2:
         return None
     lo = _number(ci[0])
     recorded = agreement.get("floor")
@@ -79,13 +80,14 @@ def _text(value: object) -> str:
 def winner_of(candidates: Sequence[Mapping[str, Any]], *, floor: float) -> dict[str, Any] | None:
     """The report's ``winner`` block over the candidate dicts, or ``None``.
 
-    A candidate with no ``agreement`` interval or no priced
-    ``serving_cost_usd_month`` is not a point on the frontier, so it is
-    skipped -- on its numbers, never on a status word, which keeps the report's
-    status vocabulary out of the contract. So is one flagged ``unreliable``:
-    more than :data:`~dagnam_contracts.audit.verdict.UNRELIABLE_ERROR_SHARE`
-    of its replay calls failed, and its score covers only the calls that
-    answered, so it never earns a switch however well those agreed.
+    A candidate with no ``agreement`` interval, or whose
+    ``serving_cost_usd_month`` is unpriced or negative, is not a point on the
+    frontier, so it is skipped -- on its numbers, never on a status word, which
+    keeps the report's status vocabulary out of the contract. So is one flagged
+    ``unreliable``: more than
+    :data:`~dagnam_contracts.audit.verdict.UNRELIABLE_ERROR_SHARE` of its replay
+    calls failed, and its score covers only the calls that answered, so it
+    never earns a switch however well those agreed.
 
     Each candidate is held to its own recorded ``agreement.floor``, falling
     back to ``floor`` -- a JSON candidate's 0.95 and a label candidate's 0.97

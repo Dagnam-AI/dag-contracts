@@ -9,8 +9,7 @@ the deployment cost planner's instance-hour prices, as
   classifier at 20 requests/s sustained with 25% average utilization —
   ``0.0416 / (20 * 3600 * 0.25) * 1000 = 0.00231`` USD per 1k requests.
 - ``gpu-small-llm``: one NVIDIA A10G on Modal -- the accelerator the platform's
-  vLLM deployments are rendered with and were confirmed live on
-  (mvp-backend ``modal_provider.py``, ``modal_vllm_app.py``) -- at Modal's list
+  vLLM deployments are rendered with and were confirmed live on -- at Modal's list
   price for the A10, $0.000306/s = $1.1016/h (https://modal.com/pricing, read
   2026-09-27), serving a <=3B-parameter model at 300 output tokens/s aggregate
   with batching and 25% average utilization —

@@ -51,7 +51,7 @@ def test_the_shipped_card_carries_the_rates_the_formulas_use() -> None:
 
 
 def test_the_gpu_rate_prices_the_machine_that_serves() -> None:
-    """R2-6: the rate priced a T4 (g4dn.xlarge) while Modal serves on an A10G.
+    """The rate priced a T4 (g4dn.xlarge) while Modal serves on an A10G.
 
     Modal bills the A10 at $0.000306/s, $1.1016/h; the throughput and
     utilization assumptions are unchanged: 1.1016 / (300 * 3600 * 0.25) * 1e6.

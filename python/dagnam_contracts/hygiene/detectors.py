@@ -41,10 +41,12 @@ from dataclasses import dataclass
 import ipaddress
 import re
 
+from dagnam_contracts.hygiene.contact import find_emails, find_phones
 from dagnam_contracts.hygiene.credentials import (
     SECRET_PLACEHOLDER,
     find_secrets,
     is_credential_member,
+    is_credential_row_member,
 )
 
 REDACTION_TEMPLATE = "[REDACTED:{code}]"
@@ -81,38 +83,6 @@ def _find_payment_cards(text: str) -> list[tuple[int, int]]:
     return spans
 
 
-# Not preceded by a digit, a `+`, or a digit-then-separator: the last of the
-# three is what stops a 16-digit card number from yielding a 12-digit "phone"
-# starting at its second group.
-# `(?![\d]|[ -]\d)` is the important half: without it the pattern backtracks
-# out of a 16-digit card number and reports its first 12 digits as a phone.
-_PHONE_CANDIDATE = re.compile(r"(?<![\d+])(?<![\d][ -])\+?\d(?:[\d\s.()-]{7,20})\d(?![\d]|[ -]\d)")
-
-
-def _find_phones(text: str) -> list[tuple[int, int]]:
-    """Spans that look like a dialable number rather than a long id.
-
-    Filters on top of the pattern, each removing a false positive the corpus
-    actually produced: a leading ``+`` admits 9-15 digits, without one the
-    floor rises to 10 (which is what stops a dashed 9-digit US SSN reading as
-    a phone number); at least one separator or a leading ``+`` is required (a
-    bare digit run is an order id far more often than a phone number); and no
-    trailing digit, so a 23-digit id cannot yield a 14-digit "phone" from its
-    prefix.
-    """
-    spans: list[tuple[int, int]] = []
-    for match in _PHONE_CANDIDATE.finditer(text):
-        raw = match.group()
-        digits = re.sub(r"\D", "", raw)
-        international = raw.startswith("+")
-        if not (9 if international else 10) <= len(digits) <= 15:
-            continue
-        if not international and not re.search(r"[\s.()-]", raw):
-            continue
-        spans.append(match.span())
-    return spans
-
-
 def _regex_finder(
     pattern: re.Pattern[str], valid: Callable[[str], bool] | None = None
 ) -> Callable[[str], list[tuple[int, int]]]:
@@ -145,6 +115,10 @@ class PiiDetector:
     """A pattern that also covers other classes' spans (a phone pattern reads an IP
     address or an Aadhaar number as digits): where a stricter class's finding
     overlaps one of this class's, the stricter class names the text, once."""
+    row_member: Callable[[str, str], bool] | None = None
+    """The same as `member` for a member of the row itself, where a key is a column
+    name; a rule here takes only a name no ordinary column carries (``row_key``
+    holds ids). Last, so a 0.4.0 caller's positional arguments still mean what they did."""
 
     @property
     def replacement(self) -> str:
@@ -259,8 +233,11 @@ _DATE = (
     rf"|{_DAY}(?:st|nd|rd|th)?\s+{_MONTH},?\s+(?:19|20)\d{{2}}"
     rf"|{_MONTH}\s+{_DAY}(?:st|nd|rd|th)?,?\s+(?:19|20)\d{{2}}"
 )
+# The keyword classes (date of birth, SIN, Aadhaar by name) open after anything but a letter,
+# not at a `\b`: a digit glued to the keyword is the end of the previous number, and
+# refusing it there would hide the keyword until that number is replaced.
 _DATE_OF_BIRTH = re.compile(
-    r"(?i)\b(?:d\.?o\.?b\.?|date\s+of\s+birth|birth\s*date|birthday|born(?:\s+on)?)"
+    r"(?i)(?<![A-Za-z])(?:d\.?o\.?b\.?|date\s+of\s+birth|birth\s*date|birthday|born(?:\s+on)?)"
     rf"[\s:=,-]*(?:(?:is|was)\s+)?(?P<s>{_DATE})(?![\d/.-]?\d)"
 )
 
@@ -269,13 +246,20 @@ _UK_NINO = re.compile(
     r" ?\d{2} ?\d{2} ?\d{2} ?[A-D])(?![A-Za-z0-9])"
 )
 
+# Between a class's name and its number: whitespace, at most one `:` or `#`,
+# whitespace. The second run belongs to the separator: as `\s*[:#]?\s*` the two
+# runs split one stretch of whitespace every possible way, which was quadratic
+# (3 s on 32,000 spaces).
+_NAME_TO_NUMBER = r"\s*(?:[:#]\s*)?"
+
 # Always beside its name, grouped 3-3-3 or bare: a grouped 9-digit number is
 # also French thousands or an order id, and passes Luhn one time in ten.
 # SINs never start 0 or 8. NAS is the French name.
 _CA_SIN = re.compile(
-    r"(?:\bSIN|\bNAS|(?i:\bsocial\s+insurance|\bnum[ée]ro\s+d['’]assurance\s+sociale))"
-    r"(?:\s+(?i:number|no\.?|#))?\s*[:#]?\s*"
-    r"(?P<s>[1-79]\d{2}(?P<sep>[ -]?)\d{3}(?P=sep)\d{3})(?![\d-])"
+    r"(?<![A-Za-z])(?:SIN|NAS|(?i:social\s+insurance|num[ée]ro\s+d['’]assurance\s+sociale))"
+    r"(?:\s+(?i:number|no\.?|#))?"
+    + _NAME_TO_NUMBER
+    + r"(?P<s>[1-79]\d{2}(?P<sep>[ -]?)\d{3}(?P=sep)\d{3})(?![\d-])"
 )
 
 _VERHOEFF_D = [
@@ -313,7 +297,9 @@ def _verhoeff_ok(digits: str) -> bool:
 # Grouped 4-4-4 with one separator, or bare beside its name; never starts 0 or 1.
 _IN_AADHAAR = re.compile(
     r"(?<![\d-])(?P<s>[2-9]\d{3}(?P<sep>[ -])\d{4}(?P=sep)\d{4})(?![\d-])"
-    r"|(?i:\baadhaa?r)(?:\s+(?:no\.?|number))?\s*[:#]?\s*(?P<bare>[2-9]\d{11})(?!\d)"
+    r"|(?<![A-Za-z])(?i:aadhaa?r(?:\s+(?:no\.?|number))?)"
+    + _NAME_TO_NUMBER
+    + r"(?P<bare>[2-9]\d{11})(?!\d)"
 )
 
 
@@ -381,9 +367,9 @@ PII_DETECTORS: tuple[PiiDetector, ...] = (
         # The lookbehind starts a match only at the head of a local part. Without
         # it every position of a long run with no `@` (a base64 image) was a
         # start that scanned to the run's end: quadratic, 18 s on 100 KB.
-        find=_regex_finder(re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+")),
+        find=find_emails,
     ),
-    PiiDetector(code="PII_PHONE", label="Phone number", find=_find_phones, loose=True),
+    PiiDetector(code="PII_PHONE", label="Phone number", find=find_phones, loose=True),
     PiiDetector(code="PII_PAYMENT_CARD", label="Payment card number", find=_find_payment_cards),
     PiiDetector(
         code="PII_NATIONAL_ID",
@@ -401,6 +387,7 @@ PII_DETECTORS: tuple[PiiDetector, ...] = (
         find=find_secrets,
         placeholder=SECRET_PLACEHOLDER,
         member=is_credential_member,
+        row_member=is_credential_row_member,
     ),
     PiiDetector(code="PII_IBAN", label="IBAN (bank account)", find=_find_ibans),
     PiiDetector(code="PII_IP_ADDRESS", label="IP address", find=_find_ip_addresses),

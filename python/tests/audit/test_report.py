@@ -52,9 +52,8 @@ def test_a_cancel_receipt_has_its_own_schema_id() -> None:
     assert CANCELLED_SCHEMA != DELETED_SCHEMA
 
 
-# Controller ruling (Task 2 review, round 1): the contract's `winner` block must be
-# dag-lib `report.py:_winner`'s block exactly -- four keys, no `p95_ms`. That overrides
-# the brief's five-key expectation, which was the lossy part of its sketch. Since 0.3.1
+# The contract's `winner` block is the SDK's own, key for key -- four keys, no
+# `p95_ms`, which a fifth key would have had to guess for a row with none. Since 0.3.1
 # `candidate_id` joins them, so the block NAMES the winning row instead of leaving every
 # reader to re-derive it by kind; the original four are unchanged.
 def test_winner_of_reads_candidate_dicts() -> None:
@@ -164,7 +163,7 @@ def _both_orders(candidates: list[dict[str, Any]]) -> list[dict[str, Any] | None
 
 
 def test_an_unreliable_candidate_never_wins() -> None:
-    """C-F2: 200 of 1,000 replay calls failed and the 800 that answered all agreed.
+    """200 of 1,000 replay calls failed and the 800 that answered all agreed.
 
     Scored on the calls that answered, its lower bound (0.9952) clears 0.97 and
     it is the cheaper row -- so on its numbers it wins, and the switch would
@@ -182,7 +181,7 @@ def test_an_unreliable_candidate_never_wins() -> None:
 
 
 def test_each_candidate_is_held_to_its_own_floor_whatever_the_order() -> None:
-    """C-F8(a): the floor used to be the LAST candidate's, so order picked the winner.
+    """The floor used to be the LAST candidate's, so order picked the winner.
 
     ``[sft 0.955@0.95, head 0.96@0.97]`` gave no winner and the reverse gave
     ``head_tune``, which fails its own 0.97. Held to its own floor, ``sft_small``
@@ -196,7 +195,7 @@ def test_each_candidate_is_held_to_its_own_floor_whatever_the_order() -> None:
 
 
 def test_the_winner_names_its_own_row_not_the_first_of_its_kind() -> None:
-    """C-F8(b): two ``head_tune`` rows, the CLI's and a Studio retrain, at one price.
+    """Two ``head_tune`` rows, the CLI's and a Studio retrain, at one price.
 
     The retrain's 0.99 wins; the block used to carry the CLI row's ids beside
     it, so the switch pointed at a model that did not earn the verdict.
@@ -238,7 +237,7 @@ def test_the_winner_names_its_own_row_not_the_first_of_its_kind() -> None:
 def test_a_failing_cheaper_twin_never_hides_a_passing_row(
     cli: dict[str, Any], retrain: dict[str, Any]
 ) -> None:
-    """C-F1: every live row goes in, and the passing CLI row still wins.
+    """Every live row goes in, and the passing CLI row still wins.
 
     The platform used to keep one row per kind BEFORE any floor was applied,
     so the cheaper failing twin was kept and the workload read NOT YET.
@@ -287,7 +286,7 @@ def test_a_null_recorded_floor_falls_back_and_a_non_numeric_bound_is_no_point() 
     ids=lambda row: row["kind"],
 )
 def test_a_non_finite_number_is_never_a_point(broken: dict[str, Any]) -> None:
-    """N3: NaN passed `lo < floor` (every comparison with NaN is False) and won,
+    """NaN passed `lo < floor` (every comparison with NaN is False) and won,
     and a NaN cost made the winner depend on the order of the list."""
     sound = _row("sound", 0.98, 50.0)
     assert winner_of([broken], floor=0.05) is None
@@ -295,8 +294,21 @@ def test_a_non_finite_number_is_never_a_point(broken: dict[str, Any]) -> None:
         assert winner is not None and winner["kind"] == "sound"
 
 
+def test_a_negative_cost_is_never_a_point() -> None:
+    """A cost below zero is a malformed row, and it would always be the cheapest:
+    it used to win over every sound candidate. Free is still a price."""
+    sound = _row("sound", 0.98, 50.0)
+    refund = _row("refund", 0.99, -5.0)
+
+    assert winner_of([refund], floor=0.05) is None
+    for winner in _both_orders([refund, sound]):
+        assert winner is not None and winner["kind"] == "sound"
+    for winner in _both_orders([_row("free", 0.99, 0.0), sound]):
+        assert winner is not None and winner["kind"] == "free"
+
+
 def test_the_constant_majority_student_does_not_win() -> None:
-    """R2-1 end to end: the 1%-positive constant "ok" student's own agreement block
+    """End to end: the 1%-positive constant "ok" student's own agreement block
     clears the 0.97 floor on exact match, and it must still not be the winner."""
     truth = ["flag"] * 10 + ["ok"] * 990
     constant = score_labels(["ok"] * 1000, truth).to_json()

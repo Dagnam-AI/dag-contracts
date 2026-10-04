@@ -3,7 +3,7 @@ Cross-split contamination detection over dataset rows.
 
 `compute_split_overlap` takes a **mapping of every split**
 (``dict[str, list[dict]]``), not two positional row lists — an earlier draft
-of this plan used a two-argument signature, which forced its caller into a
+used a two-argument signature, which forced its caller into a
 hardcoded ``train``/``eval_holdout`` check that failed open on any other
 split naming (submit ``{"training": ..., "holdout": ...}`` and no check ran
 at all). This module checks every unordered pair of splits instead, using

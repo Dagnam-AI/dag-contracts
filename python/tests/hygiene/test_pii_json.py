@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from test_pii_rows import IDS, KEYS
 
 from dagnam_contracts.hygiene.pii import (
     PII_CODES,
@@ -23,9 +24,9 @@ from dagnam_contracts.hygiene.pii import (
 _KEY = "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3"
 
 
-# A-7: a contact-extraction truth. The card is a JSON number, so textual
+# A contact-extraction truth. The card is a JSON number, so textual
 # redaction wrote `"card": [REDACTED:PII_PAYMENT_CARD]` -- not JSON.
-_CONTACT = (
+CONTACT = (
     '{"name": "Jane Doe", "email": "jane@example.com", '
     '"phone": "+1 415 555 2671", "card": 4111111111111111, "vip": true, "orders": [3, null]}'
 )
@@ -33,7 +34,7 @@ _CONTACT = (
 
 class TestRedactJsonText:
     def test_a_redacted_json_truth_still_parses(self) -> None:
-        redacted, count = redact_json_text(_CONTACT)
+        redacted, count = redact_json_text(CONTACT)
 
         assert json.loads(redacted) == {
             "name": "Jane Doe",
@@ -78,7 +79,7 @@ class TestPolicyKeepsJsonValid:
             {
                 "messages": [
                     {"role": "user", "content": "extract"},
-                    {"role": "assistant", "content": _CONTACT},
+                    {"role": "assistant", "content": CONTACT},
                 ]
             }
         ]
@@ -122,7 +123,7 @@ class TestNeverCrashes:
         ids=["5000-open", "1500-open", "100k-open", "990-deep-email"],
     )
     def test_deeply_nested_json_falls_back_to_text(self, text: str, changed: int) -> None:
-        """N1: `json.loads` raises RecursionError, not ValueError, past ~1,000 levels.
+        """`json.loads` raises RecursionError, not ValueError, past ~1,000 levels.
 
         One such row used to abort the whole call -- the audit's scan and the
         platform's PII task alike -- where 0.3.1 returned.
@@ -135,12 +136,12 @@ class TestNeverCrashes:
         assert scan_rows([{"a": text}]).counts_by_code["PII_EMAIL"] == changed
 
 
-# A P4 tool-call truth, as dag-lib writes it (sorted keys).
-_TOOL_CALL = json.dumps(
+# A tool-call truth, as the SDK writes it (sorted keys).
+TOOL_CALL = json.dumps(
     {"arguments": {"password": "hunter22", "user": "jane"}, "name": "create_user"},
     sort_keys=True,
 )
-_NAMED = json.dumps(
+NAMED = json.dumps(
     {
         "password": "a",
         "apiKey": 12345,
@@ -157,8 +158,8 @@ _NAMED = json.dumps(
 
 class TestNamedCredentialsInJson:
     def test_a_password_in_a_tool_call_truth_is_redacted(self) -> None:
-        """N2: the student was trained on this password, and the upload carried it."""
-        rows = [{"messages": [{"role": "assistant", "content": _TOOL_CALL}]}]
+        """The student was trained on this password, and the upload carried it."""
+        rows = [{"messages": [{"role": "assistant", "content": TOOL_CALL}]}]
 
         kept, changed, _ = apply_pii_policy(rows, _ALL)
 
@@ -169,7 +170,7 @@ class TestNamedCredentialsInJson:
         assert changed == 1
 
     def test_the_value_of_a_credential_key_is_redacted_whatever_it_looks_like(self) -> None:
-        redacted, count = redact_json_text(_NAMED)
+        redacted, count = redact_json_text(NAMED)
 
         assert json.loads(redacted) == {
             "password": "<SECRET>",
@@ -185,17 +186,17 @@ class TestNamedCredentialsInJson:
         assert count == 4
 
     def test_the_scan_counts_what_the_redaction_replaces(self) -> None:
-        result = scan_rows([{"a": _NAMED}, {"a": _TOOL_CALL}])
+        result = scan_rows([{"a": NAMED}, {"a": TOOL_CALL}])
 
         assert result.counts_by_code["PII_SECRET"] == 5
 
     def test_a_policy_that_drops_secrets_drops_the_row(self) -> None:
-        kept, _, removed = apply_pii_policy([{"a": _TOOL_CALL}], {"PII_SECRET": "drop"})
+        kept, _, removed = apply_pii_policy([{"a": TOOL_CALL}], {"PII_SECRET": "drop"})
 
         assert (kept, removed) == ([], 1)
 
     def test_a_credential_key_is_left_alone_when_secrets_are_not_redacted(self) -> None:
-        rows = [{"a": _TOOL_CALL}]
+        rows = [{"a": TOOL_CALL}]
 
         assert apply_pii_policy(rows, {"PII_EMAIL": "redact"}) == (rows, 0, 0)
 
@@ -216,7 +217,7 @@ class TestNamedCredentialsInJson:
 
 
 class TestAmbiguousNames:
-    """R1: data under `token` / `authorization` is kept unless it IS a credential."""
+    """Data under `token` / `authorization` is kept unless it IS a credential."""
 
     def test_ordinary_values_under_an_ambiguous_name_are_kept(self) -> None:
         text = json.dumps(
@@ -232,6 +233,26 @@ class TestAmbiguousNames:
         assert redact_json_text(text) == (text, 0)
         assert scan_rows([{"a": text}]).counts_by_code["PII_SECRET"] == 0
 
+    def test_an_id_under_an_ambiguous_name_in_a_document_is_redacted_as_in_0_4_0(self) -> None:
+        """In the row itself these names decide nothing (`test_pii_rows.py`); in a
+        document held in a string the 0.4.0 rule stands, to the byte."""
+        rows = [{"a": json.dumps(IDS)}, {"a": json.dumps(KEYS)}]
+
+        kept, changed, _ = apply_pii_policy(rows, _ALL)
+
+        assert kept == [
+            {
+                "a": '{"row_key": "<SECRET>", "idempotency_key": "<SECRET>", "nextPageToken": "<SECRET>"}'
+            },
+            {
+                "a": '{"row_key": "<SECRET>", "idempotency_key": "<SECRET>", '
+                '"nextPageToken": "<SECRET>", "auth": "<SECRET>"}'
+            },
+        ]
+        assert changed == 2
+        assert scan_rows(rows).counts_by_code["PII_SECRET"] == 7
+        assert apply_pii_policy(rows, {"PII_SECRET": "drop"}) == ([], 0, 2)
+
     def test_a_credential_under_an_ambiguous_name_is_redacted(self) -> None:
         github = "gh" + "p_" + "a1B2c3D4e5" * 4
         redacted, count = redact_json_text(
@@ -241,10 +262,10 @@ class TestAmbiguousNames:
         assert json.loads(redacted) == {"token": "<SECRET>", "authorization": "<SECRET>"}
         assert count == 2
 
-    def test_the_a11_token_under_an_ambiguous_name_is_redacted(self) -> None:
-        """H1: digitless, so neither the bare `sk-` shape nor the entropy rule took it."""
-        a11 = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
-        redacted, count = redact_json_text(json.dumps({"auth": a11, "token": a11}))
+    def test_a_digitless_key_under_an_ambiguous_name_is_redacted(self) -> None:
+        """Digitless, so neither the bare `sk-` shape nor the entropy rule took it."""
+        key = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
+        redacted, count = redact_json_text(json.dumps({"auth": key, "token": key}))
 
         assert json.loads(redacted) == {"auth": "<SECRET>", "token": "<SECRET>"}
         assert count == 2

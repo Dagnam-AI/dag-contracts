@@ -110,7 +110,7 @@ function diag(
   };
   // Severity comes from the shared catalog, never hardcoded. The type encodes
   // severity too: error keeps the historical "parameter error" (-> PARAMETER_ERROR
-  // rule), while advisory severities get types that are NOT spec rule ids, so they
+  // rule), while advisory severities get types that are NOT validation rule ids, so they
   // stay out of the count-stable corpus multiset and never flip is_valid.
   const severity = (d.severity as ValidationResult["severity"]) ?? "error";
   return {

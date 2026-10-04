@@ -2,7 +2,7 @@
 
 This JSON is generated from the platform's canonical component registry and
 regenerated-and-diffed in CI so the shipped data never drifts from that source
-of truth. The SDK ships the DATA only — it never imports backend code (spec §11).
+of truth. The SDK ships the DATA only — it never imports backend code.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ COMPONENT_REGISTRY: Final[dict[str, dict[str, Any]]] = {c["component_id"]: c for
 LAYER_TYPE_TO_COMPONENT: Final[dict[str, str]] = {
     c["layer_type"]: c["component_id"] for c in COMPONENTS
 }
-# Single-sourced diagnostic-message catalog (spec §6), shipped in the generated
+# Single-sourced diagnostic-message catalog, shipped in the generated
 # schema. The SDK renders messages from these templates exactly as the backend
 # and frontend do, so all three runtimes emit identical structured payloads.
 DIAGNOSTICS: Final[dict[str, dict[str, Any]]] = {
