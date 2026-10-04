@@ -1,0 +1,42 @@
+version: 2
+updates:
+  # The Python distribution (pyproject.toml and uv.lock in python/). The `uv`
+  # ecosystem updates the lockfile with the manifest, which the CI's
+  # `uv sync --locked` requires; a manifest-only update would fail it.
+  - package-ecosystem: "uv"
+    directory: "/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # The npm distribution (package.json and package-lock.json in npm/).
+  - package-ecosystem: "npm"
+    directory: "/npm"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Workflows pin every action by commit SHA; this keeps those pins moving.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
