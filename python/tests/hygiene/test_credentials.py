@@ -457,4 +457,6 @@ class TestUrlPasswords:
             big = shape.replace("{}", unit * 400_000)
             started = time.perf_counter()
             find_secrets(big)
-            assert time.perf_counter() - started < 5.0, (shape, unit)
+            # A backstop: the 32 KB step above is the quadratic guard, and a slow CI
+            # runner needs several times the local second.
+            assert time.perf_counter() - started < 30.0, (shape, unit)

@@ -110,8 +110,10 @@ class TestTheScanIsLinear:
         ],
     )
     def test_a_megabyte_of_urls_and_emails_scans_in_seconds(self, unit: str) -> None:
-        """32 KB first, so a quadratic pattern fails in a second."""
-        for size, limit in [(32_000, 0.5), (1_000_000, 5.0)]:
+        """32 KB first, so a quadratic pattern fails in a second. The megabyte is a
+        backstop only (about 1 s here, 5 s on a loaded CI runner; quadratic would
+        take minutes), so its budget leaves room for a slow runner."""
+        for size, limit in [(32_000, 0.5), (1_000_000, 30.0)]:
             text = unit * (size // len(unit))
             started = time.perf_counter()
             scan_rows([{"a": text}])
