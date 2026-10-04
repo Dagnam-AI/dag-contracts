@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
-## [0.4.1] - 2026-10-03
+## [0.4.1] - 2026-10-04
 
 ### Fixed
 
