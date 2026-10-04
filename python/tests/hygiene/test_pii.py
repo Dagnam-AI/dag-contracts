@@ -1,6 +1,6 @@
 """
 Tests for `dagnam_contracts/hygiene/pii.py`, including the **labelled corpus** the
-plan requires the in-repo-vs-presidio decision to be made against.
+in-repo-vs-presidio decision was made against.
 
 `LABELLED_CORPUS` is the evidence, not decoration. Each entry is a realistic
 snippet plus the classes a human says are present. `test_measured_recall_per_class`
@@ -59,7 +59,7 @@ LABELLED_CORPUS: list[tuple[str, set[str]]] = [
     # A secret with no recognisable shape, assigned to nothing: a known miss.
     ("the vault combination is correcthorsebatterystaple", {"PII_SECRET"}),
     ("commit da39a3ee5e6b4b0d3255bfef95601890afd80709", set()),
-    # --- R3-08 classes (each has its own positives and near-misses in
+    # --- the classes 0.4.0 added (each has its own positives and near-misses in
     # tests/hygiene/test_detectors.py; these are the everyday shapes) ---
     ("refund to DE89 3704 0044 0532 0130 00 please", {"PII_IBAN"}),
     ("wire to GB29NWBK60161331926819", {"PII_IBAN"}),
@@ -87,6 +87,8 @@ KNOWN_MISSES = {
     "undashed 9-digit SSN (indistinguishable from an order id without context)",
     "person names, street addresses, locations — never claimed; they need NER",
     "a bare secret with no provider shape and no `password:`-style name before it",
+    "a bare AWS secret access key (40 characters of base64 with no name beside them)",
+    "a provider key broken into short hyphenated pieces",
     "a date of birth with no birth keyword before it",
 }
 
@@ -188,6 +190,7 @@ class TestScanRows:
         assert result.pass_list == PII_CODES
         assert result.disclaimer == PII_DISCLAIMER
         assert "not certification" in result.disclaimer
+        assert "a credential in a format it does not know" in result.disclaimer
         assert not hasattr(result, "clean")
 
     def test_the_issue_sample_is_capped_but_the_counts_are_not(self) -> None:
@@ -199,14 +202,14 @@ class TestScanRows:
         assert result.counts_by_code["PII_EMAIL"] == 10
 
     def test_an_empty_list_leaf_yields_no_findings(self) -> None:
-        """`_walk_strings`'s list branch with zero elements -- the recursive
+        """The walk's list branch with zero elements -- the recursive
         walk must terminate cleanly rather than assuming at least one item."""
         result = scan_rows([{"messages": [], "a": "x@y.com"}])
 
         assert result.counts_by_code["PII_EMAIL"] == 1
 
     def test_a_non_string_non_container_leaf_is_silently_skipped(self) -> None:
-        """`_walk_strings` falls through cleanly (yields nothing) for a leaf
+        """The walk falls through cleanly (reports nothing) for a leaf
         that is none of str/dict/list -- an int, bool, or None sitting next
         to the string actually being scanned."""
         result = scan_rows([{"count": 5, "active": True, "score": None, "a": "x@y.com"}])
@@ -268,7 +271,7 @@ class TestApplyPiiPolicy:
         assert changed == 1
 
     def test_non_string_scalars_pass_through_the_rebuild_untouched(self) -> None:
-        """`_map_strings`'s traversal must not choke on -- or mutate -- a
+        """The walk must not choke on -- or mutate -- a
         non-string leaf (int, bool, None) sitting next to the string it is
         redacting."""
         rows = [{"a": "mail me at x@y.com", "count": 5, "active": True, "score": None}]
@@ -331,14 +334,14 @@ class TestSecretClass:
         assert changed == 1
 
 
+_ALL: dict[str, PiiAction] = dict.fromkeys(PII_CODES, "redact")
+
+
 def test_the_npm_package_names_the_same_classes_in_the_same_order() -> None:
     """The Studio types its PII label map against `PiiCode`; a class added here
     must reach that union, or the new class renders as a raw code."""
     npm = Path(__file__).resolve().parents[3] / "npm" / "src" / "pii.ts"
     assert tuple(re.findall(r'"(PII_[A-Z_]+)"', npm.read_text())) == PII_CODES
-
-
-_ALL: dict[str, PiiAction] = dict.fromkeys(PII_CODES, "redact")
 
 
 class TestLinearTime:

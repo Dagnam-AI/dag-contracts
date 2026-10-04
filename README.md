@@ -125,6 +125,17 @@ document valid JSON, holds each audit candidate to its own floor and never
 lets an unreliable one win, and ships the PII class names to npm as
 `PII_CODES` / `PiiCode`. `CHANGELOG.md` has the details.
 
+0.4.1 makes redacted rows scan clean by construction (a redaction placeholder
+is an opaque token and a finding is decided on the text between placeholders, so
+the platform's second scan of what the SDK redacted finds nothing, for every row
+shape and any number of findings, and `redact_rows` is the one call that gives
+it), finds a value under `password`, `client_secret` and the like in the row
+itself and not only in a JSON document held in a string (a flag column such as
+`has_password` and a blank or flag-like value such as `N/A` are left alone), and
+finds a password in a URL or after `pwd=`. `CHANGELOG.md` lists where it answers
+differently from 0.4.0, what upgrading means for a client and a platform on
+different versions, and the known limits.
+
 ## Releasing
 
 One tag publishes both packages from one source, so they can never be published

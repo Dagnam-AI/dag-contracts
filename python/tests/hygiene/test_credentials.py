@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 
 import pytest
 
@@ -16,6 +17,7 @@ from dagnam_contracts.hygiene.credentials import (
     SECRET_PLACEHOLDER,
     find_secrets,
     is_credential_member,
+    is_credential_row_member,
 )
 
 _BODY = "a1B2c3D4e5F6g7H8i9J0"
@@ -30,8 +32,8 @@ def _b64(value: dict[str, object]) -> str:
     return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
 
 
-# The A-11 fixture: a digitless key the campaign's own scan found in a prompt.
-_A11 = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
+# A digitless key, of the kind a scan of real prompts turned up.
+_DIGITLESS = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
 _JWT = ".".join([_b64({"alg": "HS256", "typ": "JWT"}), _b64({"sub": "1234567890"}), _key("", 43)])
 _PRIVATE_KEY = "PRIVATE" + " KEY"
 _PEM = f"-----BEGIN RSA {_PRIVATE_KEY}-----\nMIIEow{_BODY}\n-----END RSA {_PRIVATE_KEY}-----"
@@ -68,23 +70,23 @@ POSITIVES: list[tuple[str, str, str]] = [
     ("assignment-secret-key", "SECRET_KEY={}", "django-insecure-9x"),
     ("assignment-token", "access_token={}&x=1", "ya29" + ".a0AfH6SMBx9876543210abcdef"),
     ("assignment-passwd", "passwd:{};", "s3cr3t!"),
-    # C2b: named credentials in JSON, dict, YAML and INI form.
+    # Named credentials in JSON, dict, YAML and INI form.
     ("json-quoted-key", 'Config: {{"api_key": "{}"}}', "abcd1234efgh5678"),
     ("json-prefixed-key", 'Config: {{"db_password": "{}"}}', "Sup3rS3cret"),
     # An unambiguous quoted name with a quoted value: whatever the value is.
     ("dict-single-quotes", "{{'password': '{}'}}", "letmein"),
-    # R1: an ambiguous name, with a value that is a credential on its own.
+    # An ambiguous name, with a value that is a credential on its own.
     ("token-with-a-key", "{{'token': '{}'}}", _key("gh" + "p_", 36)),
     ("token-high-entropy", 'token: "{}"', "abc123def456ghi789"),
     ("auth-bearer", '{{"auth": "{}"}}', "Bearer " + _key("", 24)),
-    # H1: a known key shape needs no digit when a name vouches for it -- and a
+    # A known key shape needs no digit when a name vouches for it -- and a
     # mixed-case run needs none even bare.
-    ("a11-bare", "use {} now", _A11),
-    ("a11-under-auth-text", "auth: {}", _A11),
-    ("a11-under-token-text", "token: {}", _A11),
-    ("a11-under-auth-json", '{{"auth": "{}"}}', _A11),
+    ("digitless-bare", "use {} now", _DIGITLESS),
+    ("digitless-under-auth-text", "auth: {}", _DIGITLESS),
+    ("digitless-under-token-text", "token: {}", _DIGITLESS),
+    ("digitless-under-auth-json", '{{"auth": "{}"}}', _DIGITLESS),
     ("vouched-lowercase-sk", '{{"key": "{}"}}', "s" + "k-abcdefghijklmnopqrstuvwxyz"),
-    # H3: an HTTP request dump's Basic header.
+    # An HTTP request dump's Basic header.
     ("basic-header", "Authorization: Basic {}", "dXNlcjpwYXNzd29yZA=="),
     ("basic-header-lowercase", "authorization: basic {}\nHost: x", "dXNlcjpwYXNz"),
     ("json-authorization", '{{"Authorization": "{}"}}', "Basic dXNlcjpwYXNz"),
@@ -96,6 +98,23 @@ POSITIVES: list[tuple[str, str, str]] = [
     ("camel-case", 'accessToken: "{}"', "ya29" + ".a0AfH6SMBx9876543210abcdef"),
     # A provider whose `sk-` keys are 32 lowercase hex characters.
     ("sk-hex", "key {} end", "s" + "k-0123456789abcdef0123456789abcdef"),
+    # Slack's rotating tokens: the refresh token, and an access token it issued.
+    ("slack-refresh", "tok {} end", _key("xo" + "xe-1-", 40)),
+    ("slack-rotated", "tok {} end", _key("xo" + "xe.xo" + "xp-1-", 40)),
+    # A URL's userinfo: the password only, whatever the host looks like.
+    ("url-single-label-host", "postgres://user:{}@localhost/db", "pass"),
+    ("url-no-user", "redis://:{}@cache:6379/0", "s3cr3t"),
+    ("url-dotted-host", "amqp://app:{}@mq.internal.example:5672", "hunter2pw"),
+    ("url-ip-host", "mysql://root:{}@10.0.0.7:3306/app", "toor"),
+    ("url-ipv6-host", "http://ci:{}@[2001:db8::1]:8080/job", "tok3n"),
+    ("url-in-json", '{{"dsn": "https://ci:{}@git.example/repo.git"}}', "tok3n"),
+    # An `@` in the password is not the end of it: the last one before the path is.
+    ("url-at-in-password", "mongodb://admin:{}@cluster0/db", "p@ssw0rd"),
+    # A connection string's `pwd=`, whatever the value looks like.
+    ("pwd-ado", "Server=db;Database=app;Uid=sa;Pwd={};Encrypt=yes", "letmein"),
+    ("pwd-odbc", "DSN=prod;UID=sa;PWD={}", "Sup3rS3cret"),
+    ("pwd-query", "jdbc:mysql://db/app?user=x&pwd={}&ssl=1", "hunter22"),
+    ("pwd-quoted", "userPwd='{}'", "hunter22"),
 ]
 
 
@@ -113,7 +132,7 @@ def test_a_pem_block_cut_before_its_end_line_is_redacted_to_the_end() -> None:
 
 
 def test_the_audit_excerpt_token_is_found() -> None:
-    """A-11: the excerpt a run published kept this header verbatim, and the rows did too."""
+    """The excerpt a run published kept this header verbatim, and the rows did too."""
     token = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
     text = f"Jane Doe (<EMAIL>). Auth header: Bearer {token}. Be polite."
     assert _found(text) == [token]
@@ -144,7 +163,7 @@ NEGATIVES: list[tuple[str, str]] = [
     ("hf identifier", "call hf_hub_download for it"),
     ("public key", "-----BEGIN PUBLIC KEY-----\nMIIBIjAN\n-----END PUBLIC KEY-----"),
     ("github short", "gh" + "p_short"),
-    # N4: kebab-case that starts `sk-`, and token counts that are numbers.
+    # Kebab-case that starts `sk-`, and token counts that are numbers.
     ("sk kebab-case", "use sk-learn-compatible-estimators"),
     ("sk url slug", "see /sk-slovak-language-course-2024 for more"),
     ("sk css class", 'class="sk-button-primary-large-rounded"'),
@@ -152,20 +171,38 @@ NEGATIVES: list[tuple[str, str]] = [
     ("numeric quoted token", '{"max_token": "4096"}'),
     ("longer name", '{"password_hint": "your first pet"}'),
     ("empty quoted value", '{"password": ""}'),
-    # R1: ordinary data under an ambiguous name stays as it is.
+    # Ordinary data under an ambiguous name stays as it is.
     ("ner token", '{"token": "Paris", "label": "LOC"}'),
     ("pos token", "[{'token': 'the', 'pos': 'DET'}]"),
     ("claim authorization", '{"authorization": "approved", "amount": 2}'),
     ("keyboard key", 'key: "Enter", auth: pending'),
     ("short mixed token", "token: abc123"),
-    # H1: a lowercase run with no digit is still not a key when nothing vouches.
+    # A lowercase run with no digit is still not a key when nothing vouches.
     ("sk lowercase run", "see sk-verylongidentifierwithoutdashes"),
     ("sk kebab under a name", '{"key": "sk-learn-compatible-estimators"}'),
-    # H2: a rejected value stops at the next assignment; it does not become one.
+    # A rejected value stops at the next assignment; it does not become one.
     ("colon after rejected value", "token=abc:note=hello"),
-    # H3: `Basic` followed by a word, or by base64 that is not `user:pass`.
+    # `Basic` followed by a word, or by base64 that is not `user:pass`.
     ("basic prose", "Basic training for recruits. Basic auth is weak."),
     ("basic not user:pass", "Authorization: Basic dHJhaW5pbmc="),
+    # A URL with a port, a user or an `@` further on, and no password.
+    ("url port and query", "see https://example.com:8080/path?mail=a:b@c and http://db:5432"),
+    ("url port and path", "open http://localhost:3000/@scope/pkg or http://[::1]:8080/a@b"),
+    ("url user only", "clone ssh://git@github.com/org/repo.git or https://jane@example.com:8443/x"),
+    ("url empty password", "ftp://anonymous:@ftp.example.com/pub"),
+    ("url no host", "the pattern is scheme://user:password@ and nothing more"),
+    ("scp remote", "git@github.com:org/repo.git and mailto:jane@example.com?subject=a:b"),
+    # `PWD` is the shell's working directory: a path or a variable is not a password.
+    ("shell cwd", "PWD=/home/jane/project1 OLDPWD=/tmp/x9 pwd=~/code1 pwd=./rel/dir1"),
+    ("shell variable", "pwd=$(pwd); pwd=$PWD; pwd=`pwd`; $pwd=Get-Location1"),
+    ("windows cwd", "PWD=C:\\Users\\jane\\code1 pwd=%CD% pwd=\\\\host\\share1"),
+    ("pwd spaced or with a colon", "pwd = hunter22abc and pwd: hunter22abc"),
+    ("pwd in a longer name", "mypwd=abc123def"),
+    ("pwd empty", "Uid=sa;Pwd=;Encrypt=yes"),
+    # Slack: too short, inside a longer word, or no token type Slack issues.
+    ("slack refresh short", "xo" + "xe-1-abc"),
+    ("slack embedded", "bo" + "xo" + "xe-" + "1-a1B2c3D4e5F6g7H8"),
+    ("slack other letter", "xo" + "xq-1-a1B2c3D4e5F6g7H8"),
 ]
 
 
@@ -179,63 +216,69 @@ def test_the_placeholder_is_the_documented_one() -> None:
 
 
 def test_every_named_credential_in_a_config_line_is_found() -> None:
-    """N2: the closing quote of a JSON key used to defeat the assignment rule."""
+    """The closing quote of a JSON key used to defeat the assignment rule."""
     text = 'Config: {"api_key": "abcd1234efgh5678", "db_password": "Sup3rS3cret"}'
     assert _found(text) == ["abcd1234efgh5678", "Sup3rS3cret"]
 
 
-@pytest.mark.parametrize(
-    ("key", "value", "expected"),
-    [
-        ("password", "a", True),
-        ("db_password", "hunter22", True),
-        ("apiKey", "12345", True),
-        ("X-Api-Key", "abc", True),
-        ("Authorization", "Basic dXNlcjpwYXNz", True),
-        ("aws_secret_access_key", "wJalr", True),
-        ("clientSecret", "s", True),
-        ("private_key", "k", True),
-        ("accessToken", "t", False),
-        ("accessToken", "ya29.a0AfH6SMBx9876543210abcdef", True),
-        ("max_token", "1024", False),
-        ("token", "1,024.5", False),
-        ("password", "", False),
-        ("password_hint", "pet", False),
-        ("token_count", "abc123def456", False),
-        ("maxTokens", "abc", False),
-        ("tokenizer", "bert-base", False),
-        # R1: unambiguous names take any value...
-        ("password", "string", True),
-        ("secret_key", "x", True),
-        ("passwd", "hunter", True),
-        # ...ambiguous ones only a value that is a credential on its own.
-        ("token", "Paris", False),
-        ("token", _key("gh" + "p_", 36), True),
-        ("token", "abc123def456ghi789", True),
-        ("token", "abcdefghijklmnopqrstuvwxyz", False),
-        ("token", "2024-09-27", False),
-        ("authorization", "approved", False),
-        ("Authorization", "Bearer " + _JWT, True),
-        ("auth", "Bearer " + _key("", 24), True),
-        ("key", "Enter", False),
-        ("primary_key", "id", False),
-        ("key", _key("s" + "k-", 48), True),
-        ("nextPageToken", "abc", False),
-        ("Authorization", "Basic not-base64!", False),
-        ("Authorization", "Basic abcde", False),  # base64-shaped, but does not decode
-        ("Authorization", "Basic /w==", False),  # decodes, but to a byte that is not text
-        # H1: a vouched-for key shape needs no digit.
-        ("auth", _A11, True),
-        ("token", _A11, True),
-        ("key", "s" + "k-abcdefghijklmnopqrstuvwxyz", True),
-        ("key", "sk-learn-compatible-estimators", False),
-        ("Authorization", "Basic dHJhaW5pbmc=", False),
-    ],
-)
+MEMBERS: list[tuple[str, str, bool]] = [
+    ("password", "a", True),
+    ("db_password", "hunter22", True),
+    ("apiKey", "12345", True),
+    ("X-Api-Key", "abc", True),
+    ("Authorization", "Basic dXNlcjpwYXNz", True),
+    ("aws_secret_access_key", "wJalr", True),
+    ("clientSecret", "s", True),
+    ("private_key", "k", True),
+    ("accessToken", "t", False),
+    ("accessToken", "ya29.a0AfH6SMBx9876543210abcdef", True),
+    ("max_token", "1024", False),
+    ("token", "1,024.5", False),
+    ("password", "", False),
+    ("password_hint", "pet", False),
+    ("token_count", "abc123def456", False),
+    ("maxTokens", "abc", False),
+    ("tokenizer", "bert-base", False),
+    # Unambiguous names take any value...
+    ("password", "string", True),
+    ("secret_key", "x", True),
+    ("passwd", "hunter", True),
+    # ...ambiguous ones only a value that is a credential on its own.
+    ("token", "Paris", False),
+    ("token", _key("gh" + "p_", 36), True),
+    ("token", "abc123def456ghi789", True),
+    ("token", "abcdefghijklmnopqrstuvwxyz", False),
+    ("token", "2024-09-27", False),
+    ("authorization", "approved", False),
+    ("Authorization", "Bearer " + _JWT, True),
+    ("auth", "Bearer " + _key("", 24), True),
+    ("key", "Enter", False),
+    ("primary_key", "id", False),
+    ("key", _key("s" + "k-", 48), True),
+    ("nextPageToken", "abc", False),
+    ("Authorization", "Basic not-base64!", False),
+    ("Authorization", "Basic abcde", False),  # base64-shaped, but does not decode
+    ("Authorization", "Basic /w==", False),  # decodes, but to a byte that is not text
+    # A vouched-for key shape needs no digit.
+    ("auth", _DIGITLESS, True),
+    ("token", _DIGITLESS, True),
+    ("key", "s" + "k-abcdefghijklmnopqrstuvwxyz", True),
+    ("key", "sk-learn-compatible-estimators", False),
+    ("Authorization", "Basic dHJhaW5pbmc=", False),
+    # A URL that carries a password is a credential on its own.
+    ("auth", "amqp://app:hunter2pw@mq", True),
+    ("key", "https://example.com:8080/path", False),
+    # `pwd` is a credential name only in a connection string's `pwd=`.
+    ("pwd", "hunter22", False),
+    ("dsn_key", "Uid=sa;Pwd=letmein", True),
+]
+
+
+@pytest.mark.parametrize(("key", "value", "expected"), MEMBERS)
 def test_a_member_is_a_credential_by_its_key_whatever_its_value(
     key: str, value: str, expected: bool
 ) -> None:
-    """C2b as the owner settled it (R1).
+    """The two kinds of credential name.
 
     Under an unambiguous name (``password``, ``secret``, ``api_key``, ...) the
     value is a credential however it looks. Under an ambiguous one (``token``,
@@ -259,5 +302,159 @@ def test_a_member_is_a_credential_by_its_key_whatever_its_value(
     ],
 )
 def test_each_assignment_in_a_run_is_judged_on_its_own(text: str, secrets: list[str]) -> None:
-    """H2: a rejected `token=` value ran on over the `:password=` after it."""
+    """A rejected `token=` value ran on over the `:password=` after it."""
     assert _found(text) == secrets
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "expected"),
+    [
+        ("password", "a", True),
+        ("db_password", "hunter22", True),
+        ("clientSecret", "s", True),
+        ("X-Api-Key", "abc", True),
+        ("aws_secret_access_key", "wJalr", True),
+        ("password", "", False),
+        ("password_hint", "pet", False),
+        ("user", "jane", False),
+        # A name an id column also carries decides nothing, whatever the value.
+        ("row_key", "a81f3c9e2b7d4f60", False),
+        ("idempotency_key", "ord_9f8e7d6c5b4a3210", False),
+        ("nextPageToken", "CAESEAoOc29tZS1wYWdlLXRva2Vu", False),
+        ("token", _key("gh" + "p_", 36), False),
+        ("Authorization", "Basic dXNlcjpwYXNz", False),
+        ("auth", _DIGITLESS, False),
+    ],
+)
+def test_a_row_member_is_a_credential_only_under_an_unambiguous_name(
+    key: str, value: str, expected: bool
+) -> None:
+    """A row's keys are column names, and `row_key` or `nextPageToken` names an id
+    column. So in a row only a name that cannot be one takes its value; a
+    credential under any other name is left to the text scan."""
+    assert is_credential_row_member(key, value) is expected
+    assert is_credential_member(key, value) or not expected
+
+
+class TestUrlPasswords:
+    """`scheme://user:password@host`: the password, to the `@` that opens the host."""
+
+    @pytest.mark.parametrize("char", ['"', "'", "`", "<", ">"])
+    def test_a_quote_backtick_or_angle_bracket_in_the_password_is_part_of_it(
+        self, char: str
+    ) -> None:
+        """RFC 3986 wants these percent-encoded, and connection strings in the wild do
+        not: all five were missed, so the whole password leaked."""
+        password = f"pa{char}ss"
+
+        assert _found(f"https://u:{password}@host/x") == [password]
+        assert _found(f"https://u:{password}@host.example.com:8443/a?b=c#d") == [password]
+        assert _found(f"{char}https://u:{password}@host.com/x{char}") == [password]
+
+    @pytest.mark.parametrize(
+        "password", ["pa%22ss", "p%27w", "pa%60ss", "p%3Ca", "pa%3Ess", "p%40ss%3Aw%2Frd", 'a\\"b']
+    )
+    def test_a_percent_encoded_or_escaped_password_is_found(self, password: str) -> None:
+        assert _found(f"postgres://u:{password}@db.internal/app") == [password]
+
+    @pytest.mark.parametrize("char", ['"', "'", "`", "<", ">"])
+    def test_such_a_character_ends_the_password_when_punctuation_follows_it(
+        self, char: str
+    ) -> None:
+        """A quote is a password character only with a letter, digit or `%` after it.
+        `"http://localhost:8080","a@b.co"` is a port and a string, not a password."""
+        assert find_secrets(f"{char}http://localhost:8080{char},{char}a@b.co{char}") == []
+        assert find_secrets(f"http://localhost:8080{char}+{char}a@b.co") == []
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            '{"a":"http://localhost:8080","m":"x@y.co"}',
+            "{'url': 'http://localhost:8080', 'email': 'x@y.co'}",
+            '<a href="http://localhost:8080">x@y.co</a>',
+            'see "http://localhost:8080">x@y.co',
+            "ports http://h:80`x` or http://h:81<",
+        ],
+    )
+    def test_a_port_followed_by_text_that_holds_an_at_sign_is_not_a_password(
+        self, text: str
+    ) -> None:
+        assert find_secrets(text) == []
+
+    @pytest.mark.parametrize(
+        ("text", "passwords"),
+        [
+            ('"https://u:pw@h.com","a@b.co"', ["pw"]),
+            ("'https://u:pw@h.com' and 'https://v:qw@i.com'", ["pw", "qw"]),
+            ("<https://u:pw@h.com>", ["pw"]),
+            ('["https://a:b@h.com","https://c:d@i.com"]', ["b", "d"]),
+            # An `@` in the password: the last one before the host.
+            ("mongodb://admin:p@ssw0rd@cluster0/db", ["p@ssw0rd"]),
+            ("mongodb://admin:p@ss@w0rd@cluster0/db", ["p@ss@w0rd"]),
+            ('x="mongodb://admin:p@ss"w0rd@cluster0/db"', ['p@ss"w0rd']),
+        ],
+    )
+    def test_the_password_ends_at_the_at_sign_that_opens_the_host(
+        self, text: str, passwords: list[str]
+    ) -> None:
+        assert _found(text) == passwords
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "http://localhost:8080,john@example.com",
+            "http://db:5432;ops@corp.example",
+            "url=http://h:1&cc=a@b.co",
+            "http://localhost:3000|admin@x.co",
+            "http://h:80>a@b.co",
+            "http://h:65535,a@b.co",
+            "http://u:80,a@host.example.com",
+        ],
+    )
+    def test_a_port_then_a_separator_then_an_address_is_not_a_password(self, text: str) -> None:
+        """`8080,john` reads as a password only if one forgets it starts like a port."""
+        assert find_secrets(text) == []
+
+    @pytest.mark.parametrize(
+        ("text", "password"),
+        [("http://h:123456,a@b.co", "123456,a"), ("http://h:80x,a@b.co", "80x,a")],
+    )
+    def test_a_longer_run_or_a_letter_makes_it_a_password_again(
+        self, text: str, password: str
+    ) -> None:
+        """Six digits are not a port, and `80x` is not digits: both keep the old reading."""
+        assert _found(text) == [password]
+
+    def test_the_scheme_and_the_host_ask_only_that_no_space_stands_there(self) -> None:
+        """A neighbour that must be a particular character fails the moment another class
+        replaces it; so the scheme only has to not be whitespace, and so does the host."""
+        assert _found("4111111111111111://u:pw@h") == ["pw"]
+        assert _found("x://u:pw@10.0.0.7:3306/app") == ["pw"]
+        assert _found("x://u:pw@[2001:db8::1]/app") == ["pw"]
+        assert find_secrets("x ://u:pw@h") == []
+        assert find_secrets("x://u:pw@ h") == []
+
+    @pytest.mark.parametrize(
+        "shape",
+        [
+            "https://u:{}",
+            "https://u:" + 'a"' * 20 + "{}",
+            "https://u:a@{}",
+            "https://u:{}@x/",
+            "{}://u:{}",
+            "https://u:<{}>",
+        ],
+    )
+    def test_a_megabyte_of_password_characters_is_scanned_in_linear_time(self, shape: str) -> None:
+        """Every character the password may hold, with and without the `@` that ends it:
+        32 KB first, so a quadratic pattern fails here in a second."""
+        for unit in ["a", "a@", 'a"', "a@b", "@a", "a'@", ":", "://", "a>"]:
+            small = shape.replace("{}", unit * 16_000)
+            started = time.perf_counter()
+            find_secrets(small)
+            assert time.perf_counter() - started < 0.5, (shape, unit)
+        for unit in ["a", "a@", 'a"', "a@b", "a>"]:
+            big = shape.replace("{}", unit * 400_000)
+            started = time.perf_counter()
+            find_secrets(big)
+            assert time.perf_counter() - started < 5.0, (shape, unit)

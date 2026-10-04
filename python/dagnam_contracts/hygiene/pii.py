@@ -39,7 +39,67 @@ name (`{"password": ...}`) whatever its value, under `token`, `authorization`,
 defaults, so its spacing, duplicate keys and float spelling are normalised,
 and two keys redacted to one placeholder collide (the later value wins). A
 document that does not parse, or nests too deep to walk, is read as plain
-text. `redact_json_text` is the same path for a caller holding JSON text.
+text; and when what that redaction leaves parses (a raw tab inside a phone
+number was what kept it from parsing), the result is walked as a document too,
+once. `redact_json_text` is the same path for a caller holding JSON text.
+
+The row itself, and every object nested in it, gets the member rule for the
+credential column names only: the value under `password`, `client_secret` and the
+like is a `PII_SECRET`, string or number. A name counts when it is, or ends in as a
+word of its own, one of the unambiguous names (`db_password`, `userPassword`,
+`aws-secret-access-key`), unless it opens with `has`, `is`, `needs`, `requires`,
+`use`, `allow`, `enable`, `enabled`, `show`, `with`, `no` or `top`, which makes it a
+flag or a label (`has_password`, `is_secret`, `top_secret`); `password_hint` and
+`passwords` are not credential names. A boolean, `None`, a blank string and a
+flag-like one (`yes`, `no`, `true`, `false`, `n/a`, `none`, `null`, `-`, in any
+case) under such a name is not a secret; a list or an object under it has each
+scalar in it replaced by that rule, at any depth. That is all a row shares with a
+document, because a row's keys are column names:
+
+* `token`, `authorization`, `auth` and `key` decide nothing in a row. A column
+  named `row_key`, `idempotency_key` or `nextPageToken` holds ids, and a drop
+  policy would lose every row of a dataset keyed on one. The value is still
+  scanned as text, so a credential in a known format under such a name is found.
+* A bare number in a row is not scanned. A card number held as a number is
+  left alone: an id or a timestamp column would read as a card one row in ten
+  and come back as a string.
+* A row's keys are not redacted, at any depth.
+
+**Redacted rows scan clean, by construction.** The platform scans again what the SDK
+redacted and uploaded, so a placeholder is an opaque token: text that is already a
+redaction placeholder -- any class's -- is never a finding, and a finding is decided
+on one run of text between placeholders read as a string of its own (`spans.py` has the
+argument). Redaction replaces every finding in one pass, so, for every row shape and
+every policy that redacts every class:
+
+* `scan(redact(rows))` finds nothing;
+* `redact(redact(rows)) == redact(rows)`;
+* the count a scan gives for the original, per class, is the number of placeholders
+  of that class the redaction wrote -- except that two keys of a document that redact to
+  the same placeholder collide (one member takes the other's place), and that in a document
+  which parses only once its own redaction has replaced something, a member taken whole
+  removes the placeholders of the findings in its value, which the scan counted.
+
+There is no exception clause and no pass limit: findings glued together, a list of
+any length, a document that only parses after its own redaction, a key or a member
+whose reading changes when the text beside it is replaced, all settle in the one call.
+`tests/hygiene/test_pii_rescan.py`, `test_pii_adjacent.py` and `test_pii_policy.py` hold
+this over every input the PII tests pin, in every row shape, over every pair and
+triple of classes in each separator, and over seeded random rows.
+
+**Policies.** The scan is the single source of truth: it resolves every class, and a
+policy resolves every class too and then acts on its subset. A class set to `redact`
+has exactly the findings the scan reports for it replaced -- a phone number that only
+reads as one once a neighbouring secret is a finding is replaced by a phone-only policy
+too -- and a class set to `drop` drops the row when the scan reports one. Nothing more
+is promised for a policy that redacts only some classes: once class A's text is
+replaced, text of B that was glued to it or joined to it by one separator may read
+differently, so a later scan of a partly redacted row can count a different number of B,
+and can still report more of A (replacing a finding can lift a guard that was refusing a
+neighbour). A document that parses only once some classes are replaced has its credential
+members replaced when the policy redacts the classes that made it parse; one that
+does not leaves the members to a policy that does. Redacting every class has no such
+caveat.
 
 Findings are `PiiIssue`-shaped on purpose — the same ``row_index`` / ``code``
 / ``message`` / ``severity`` record a row-level format issue uses, so a report
@@ -52,9 +112,10 @@ Pure — no session, no I/O.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 import json
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from dagnam_contracts.hygiene.detectors import (
     PII_CODES,
@@ -62,22 +123,21 @@ from dagnam_contracts.hygiene.detectors import (
     REDACTION_TEMPLATE,
     PiiDetector,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping
+from dagnam_contracts.hygiene.rows import redact_document, redact_fields, redact_string
 
 PII_DISCLAIMER = (
     "Best-effort assistance, not certification. This scan looks only for the "
     "classes listed below, using pattern and checksum rules; it will miss "
     "personal data it was not built to recognise (names, addresses, free-text "
-    "identifiers, anything in an unsupported locale). An empty result means "
-    "nothing matched these rules — it does not mean the dataset is free of "
-    "personal data, and no artifact produced here may be labelled as such."
+    "identifiers, anything in an unsupported locale) and a credential in a "
+    "format it does not know. An empty result means nothing matched these "
+    "rules — it does not mean the dataset is free of personal data or of "
+    "secrets, and no artifact produced here may be labelled as such."
 )
 
 PiiAction = Literal["redact", "drop", "ignore"]
 
-_ALL_CODES = set(PII_CODES)
+_ALL_CODES = frozenset(PII_CODES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,53 +172,6 @@ class PiiScanResult:
     rows_scanned: int = 0
 
 
-def _walk_strings(value: Any, path: str = "") -> Iterator[tuple[str, str]]:
-    """Yield ``(json-ish path, text)`` for every string anywhere in `value`.
-
-    Fully recursive, and it has to be: `chat-messages` — the platform's most
-    common format — holds its text at ``messages[0].content``, two levels
-    down inside a list of dicts. A one-level flatten would report zero
-    findings on exactly the dataset shape a user is most likely to scan,
-    which is the silent-miss failure this feature exists to avoid.
-    """
-    if isinstance(value, str):
-        yield path or "<row>", value
-    elif isinstance(value, dict):
-        for key in sorted(value):
-            yield from _walk_strings(value[key], f"{path}.{key}" if path else str(key))
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            yield from _walk_strings(item, f"{path}[{index}]")
-
-
-def _map_strings(
-    value: Any, transform: Callable[[str], tuple[str, Counter[str]]]
-) -> tuple[Any, Counter[str]]:
-    """Rebuild `value` with `transform` applied to every string inside it.
-
-    The write-side mirror of `_walk_strings` — same traversal, so anything the
-    scan can report is something the redactor can actually rewrite. Returns
-    the new value and the findings per class.
-    """
-    if isinstance(value, str):
-        return transform(value)
-    total: Counter[str] = Counter()
-    if isinstance(value, dict):
-        rebuilt: dict[Any, Any] = {}
-        for key, item in value.items():
-            rebuilt[key], found = _map_strings(item, transform)
-            total += found
-        return rebuilt, total
-    if isinstance(value, list):
-        items: list[Any] = []
-        for item in value:
-            new_item, found = _map_strings(item, transform)
-            items.append(new_item)
-            total += found
-        return items, total
-    return value, total
-
-
 def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResult:
     """Report every PII finding in `rows`, capped at `max_issues` samples.
 
@@ -170,8 +183,7 @@ def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResul
     counts: dict[str, int] = dict.fromkeys(PII_CODES, 0)
 
     for row_index, row in enumerate(rows):
-        for field_path, text in _walk_strings(row):
-            _, found = _findings(text, _ALL_CODES)
+        for field_path, found in redact_fields(row, _ALL_CODES)[1]:
             for detector in PII_DETECTORS:
                 matched = found[detector.code]
                 if not matched:
@@ -197,113 +209,6 @@ def scan_rows(rows: list[dict[str, Any]], max_issues: int = 500) -> PiiScanResul
     )
 
 
-def _redact_text(text: str, codes: set[str]) -> tuple[str, Counter[str]]:
-    """``text`` with every span the named detectors match replaced; the findings per class.
-
-    Overlapping findings (an email inside a password value, a phone pattern
-    over an IP address) are one region over their union, replaced once --
-    replacing each in turn would cut the text at offsets the first replacement
-    already moved -- and counted once, under the earliest finder that is not
-    `PiiDetector.loose`.
-    """
-    hits = sorted(
-        (
-            (start, end, detector)
-            for detector in PII_DETECTORS
-            if detector.code in codes
-            for start, end in detector.find(text)
-        ),
-        key=lambda hit: (hit[0], hit[1]),
-    )
-    regions: list[tuple[int, int, PiiDetector]] = []
-    for start, end, detector in hits:
-        if regions and start < regions[-1][1]:
-            first, last, named = regions[-1]
-            regions[-1] = (first, max(last, end), detector if named.loose else named)
-        else:
-            regions.append((start, end, detector))
-    pieces: list[str] = []
-    cursor = 0
-    for start, end, detector in regions:
-        pieces += (text[cursor:start], detector.replacement)
-        cursor = end
-    pieces.append(text[cursor:])
-    return "".join(pieces), Counter(detector.code for _, _, detector in regions)
-
-
-def _member_text(value: Any) -> str | None:
-    """A JSON member's value as text when it is a string or a number, else ``None``."""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, int | float) and not isinstance(value, bool):
-        return json.dumps(value)
-    return None
-
-
-def _redact_member(key: str, value: Any, codes: set[str]) -> tuple[Any, Counter[str]]:
-    """One member's value: whole, when a class finds it by its key; else like any value."""
-    text = _member_text(value)
-    for detector in PII_DETECTORS:
-        if (
-            text is not None
-            and detector.member is not None
-            and detector.code in codes
-            and detector.member(key, text)
-        ):
-            return detector.replacement, Counter({detector.code: 1})
-    return _redact_json_value(value, codes)
-
-
-def _redact_json_value(value: Any, codes: set[str]) -> tuple[Any, Counter[str]]:
-    """`value` with every string, key and number inside it redacted; the findings per class.
-
-    A number that matched is replaced by the redacted text of it, a JSON
-    string -- the placeholder is text, and a bare one is not JSON.
-    """
-    text = _member_text(value)
-    if text is not None:
-        redacted, found = _redact_text(text, codes)
-        return (redacted if found or isinstance(value, str) else value), found
-    total: Counter[str] = Counter()
-    if isinstance(value, list):
-        items: list[Any] = []
-        for item in value:
-            new_item, found = _redact_json_value(item, codes)
-            items.append(new_item)
-            total += found
-        return items, total
-    if isinstance(value, dict):
-        rebuilt: dict[str, Any] = {}
-        for key, item in value.items():
-            new_key, key_found = _redact_text(key, codes)
-            rebuilt[new_key], found = _redact_member(key, item, codes)
-            total += key_found + found
-        return rebuilt, total
-    return value, total
-
-
-def _redact_document(text: str, value: Any, codes: set[str]) -> tuple[str, Counter[str]]:
-    """``text``, which parsed to ``value``, redacted and re-serialised only if it changed."""
-    redacted, found = _redact_json_value(value, codes)
-    return (json.dumps(redacted, ensure_ascii=False) if found else text), found
-
-
-def _findings(text: str, codes: set[str]) -> tuple[str, Counter[str]]:
-    """One string of a row, redacted for ``codes``, and what was found per class.
-
-    Only a document that opens with ``{`` or ``[`` is read as JSON: a field of
-    plain text that happens to parse as a number is still plain text. One that
-    does not parse, or nests deeper than the parser or the walk can go
-    (``RecursionError``), is read as plain text -- never a crash.
-    """
-    if text.lstrip()[:1] in ("{", "["):
-        try:
-            return _redact_document(text, json.loads(text), codes)
-        except (ValueError, RecursionError):
-            pass
-    return _redact_text(text, codes)
-
-
 def redact_json_text(text: str) -> tuple[str, int]:
     """Redact every PII class in JSON ``text`` and keep it JSON; ``(text, findings)``.
 
@@ -314,10 +219,34 @@ def redact_json_text(text: str) -> tuple[str, int]:
     JSON, or nests too deep to walk, is redacted as plain text.
     """
     try:
-        redacted, found = _redact_document(text, json.loads(text), _ALL_CODES)
+        document: Any = json.loads(text)
     except (ValueError, RecursionError):
-        redacted, found = _redact_text(text, _ALL_CODES)
+        _, redacted, found = redact_string(text, _ALL_CODES)
+    else:
+        _, redacted, found = redact_document(text, document, _ALL_CODES)
     return redacted, sum(found.values())
+
+
+def redact_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Redact every class in `rows`; ``(rows, counts_by_code)``.
+
+    The redact-everything policy in one call, and what a client does last before it
+    uploads: ``scan_rows`` of the result finds nothing, and ``counts_by_code`` (every
+    class, zero included) is what `scan_rows` of the input reports, which is also the
+    number of placeholders of each class written. A row with nothing to redact is
+    returned as the same object. Redact the row exactly as it will be uploaded --
+    after any cut to a length, after any case folding -- and never cut it afterwards:
+    a cut can split a placeholder into text a scan reads.
+    """
+    redacted: list[dict[str, Any]] = []
+    counts: dict[str, int] = dict.fromkeys(PII_CODES, 0)
+    for row in rows:
+        new_row, fields = redact_fields(row, _ALL_CODES)
+        for _, found in fields:
+            for code, matched in found.items():
+                counts[code] += matched
+        redacted.append(new_row if fields else row)
+    return redacted, counts
 
 
 def apply_pii_policy(
@@ -329,33 +258,40 @@ def apply_pii_policy(
     `policy` is treated as ``"ignore"``: the default is always to leave the
     user's data alone.
 
+    Every class is resolved, as the scan does, and the policy acts on its subset: a
+    row is removed when the scan reports a class set to ``"drop"`` in it, and a
+    ``"redact"`` class has exactly the spans the scan reports for it replaced.
+
     ``"drop"`` beats ``"redact"`` for a row that matches both — dropping is
     the stricter answer, and a row the user asked to remove must not survive
     in redacted form because a different class happened to match it too.
     """
-    unknown = sorted(set(policy) - set(PII_CODES))
+    unknown = sorted(set(policy) - _ALL_CODES)
     if unknown:
         raise ValueError(f"Unknown PII finding class(es): {', '.join(unknown)}")
 
     drop_codes = {code for code, action in policy.items() if action == "drop"}
-    redact_codes = {code for code, action in policy.items() if action == "redact"}
+    redact_codes = frozenset(code for code, action in policy.items() if action == "redact")
 
     kept: list[dict[str, Any]] = []
     rows_changed = 0
     rows_removed = 0
 
     for row in rows:
-        if drop_codes and any(_findings(text, drop_codes)[1] for _, text in _walk_strings(row)):
+        new_row, fields = redact_fields(row, redact_codes)
+        found: Counter[str] = Counter()
+        for _, per_field in fields:
+            found += per_field
+        if any(found[code] for code in drop_codes):
             rows_removed += 1
-            continue
-
-        if not redact_codes:
+        elif new_row != row:
+            # A class that is found but not acted on leaves the row as it was; so does
+            # a document that only parses once another class is replaced (see
+            # `rows.redact_string`), when that class is not among the ones to redact.
+            rows_changed += 1
+            kept.append(new_row)
+        else:
             kept.append(row)
-            continue
-
-        new_row, found = _map_strings(row, lambda text: _findings(text, redact_codes))
-        rows_changed += int(bool(found))
-        kept.append(new_row)
 
     return kept, rows_changed, rows_removed
 
@@ -371,5 +307,6 @@ __all__ = [
     "PiiScanResult",
     "apply_pii_policy",
     "redact_json_text",
+    "redact_rows",
     "scan_rows",
 ]

@@ -32,5 +32,8 @@ coverage.json
 /python/coverage.json
 /python/coverage.xml
 
+# Hypothesis's example database, written next to wherever the tests run
+.hypothesis/
+
 # macOS Finder metadata
 .DS_Store

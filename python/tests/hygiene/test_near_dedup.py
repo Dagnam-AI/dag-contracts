@@ -1,7 +1,7 @@
 """
 Tests for `dagnam_contracts/hygiene/near_dedup.py`.
 
-The three properties the plan names, plus the ones that make them meaningful:
+The three properties that matter, plus the ones that make them meaningful:
 idempotence, no false merge below the threshold, and a decision at the
 threshold that does not depend on set/dict iteration order.
 """
@@ -102,6 +102,20 @@ class TestNearDuplicateDetection:
         result = compute_near_duplicates(rows, 0.9)
 
         assert result.duplicate_indices == [1, 2, 3]
+
+    def test_a_pair_that_shares_a_band_below_the_threshold_is_not_reported(self) -> None:
+        """The LSH bands propose candidates; the estimate decides. Rows built so that one
+        band collides while the estimated similarity is 0.44 are a candidate and no pair."""
+        rng = random.Random(0)
+        words = _sentence(rng, 12).split()
+        rows = [{"t": " ".join(words)}, {"t": " ".join(words[:8] + [w[::-1] for w in words[8:]])}]
+        signatures = [minhash_signature(shingles(row_text(row))) for row in rows]
+
+        assert estimate_jaccard(signatures[0], signatures[1]) < 0.5
+        result = compute_near_duplicates(rows, 0.9)
+
+        assert result.pairs == []
+        assert result.duplicate_indices == []
 
     def test_an_empty_dataset_is_handled(self) -> None:
         result = compute_near_duplicates([], 0.9)

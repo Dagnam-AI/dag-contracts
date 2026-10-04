@@ -43,11 +43,12 @@ Results are frozen dataclasses; everything is standard library only.
 ```python
 from dagnam_contracts import (
     apply_pii_policy, compute_exact_duplicates, compute_near_duplicates,
-    compute_split_overlap, parse_chat_prompt, render_chat_prompt, scan_rows,
+    compute_split_overlap, parse_chat_prompt, redact_rows, render_chat_prompt, scan_rows,
 )
 
 report = scan_rows(rows)                      # counts_by_code, issues, pass_list, disclaimer
 rows, changed, removed = apply_pii_policy(rows, {"PII_EMAIL": "redact"})
+redacted, counts = redact_rows(rows)           # every class, scan-clean by construction
 compute_exact_duplicates(rows).duplicate_indices
 compute_near_duplicates(rows, threshold=0.9).pairs
 compute_split_overlap({"train": train_rows, "test": test_rows}).has_contamination
@@ -64,11 +65,39 @@ schema interpreter plus, since 0.3.1, the audit's reference rows and serving rat
 card, and since 0.4.0 the PII class names — the data a Studio displays, never the
 logic that computes a verdict.
 
-Since 0.4.0 the scan also finds credentials (`PII_SECRET`: provider keys, JWTs,
-PEM private keys, `Bearer` tokens, `password=`-style assignments and the value of
-a JSON key named like a credential), redacted as `<SECRET>`, and redaction keeps
-JSON valid: a JSON object or array inside a row, or the text handed to
-`redact_json_text`, is read and redacted value by value.
+Since 0.4.0 the scan also finds credentials in the formats it knows
+(`PII_SECRET`: provider keys, JWTs, PEM private keys, `Bearer` tokens,
+`password=`-style assignments, the value of a JSON key named like a credential
+and, since 0.4.1, a password in a URL or after `pwd=`), redacted as `<SECRET>`.
+A credential in no known format (a bare AWS secret key, a passphrase in prose)
+is not found. Redaction keeps JSON valid: a JSON object or array inside a row,
+or the text handed to `redact_json_text`, is read and redacted value by value.
+Since 0.4.1 a member of the row itself under a credential column name
+(`password`, `client_secret`, `api_key`, `db_password`, ...) is found too, a
+string or a number, and every scalar in a list or object under it. A flag
+column (`has_password`, `is_secret`, `top_secret`) and a blank or flag-like
+value (`yes`, `no`, `true`, `n/a`, `none`, `-`) are not secrets. A name an id
+column also carries (`row_key`, `nextPageToken`) decides nothing there, a bare
+number in a row is not scanned, and a row's keys are left as they are. A URL's
+password is replaced as a secret; with a dotted host the host goes with it
+(`ftp://anonymous:pw@ftp.example.com/` becomes `ftp://anonymous:<SECRET>/`),
+because the email pattern reads `pw@ftp.example.com` as an address and the two
+overlap.
+A placeholder is an opaque token, and a finding is decided on the text between
+placeholders, read as a string of its own. So rows redacted for every class
+scan clean by construction, for every row shape and any number of findings, with
+no exception: `scan_rows` of the result finds nothing, redacting it again returns
+it, and the count for the original is the number of placeholders written (in a
+document, two keys that redact to one placeholder collide and one member takes the
+other's place; and in one that parses only once its redaction has replaced something,
+a member taken whole removes the placeholders of findings in its value that the scan
+counted).
+`redact_rows(rows)` is that redact-everything policy in one call, returning the
+rows and the counts; call it last, on the row exactly as it will be uploaded
+(after any cut to a length), because a cut after redaction can split a
+placeholder into text a scan reads. A policy that redacts only some classes
+replaces exactly the findings the scan reports for them and promises nothing more
+about a later scan of the row.
 0.4.0 also finds IBANs, IP addresses, dates of birth (beside a birth keyword),
 UK NINOs, Canadian SINs, Indian Aadhaar and PAN numbers and EU VAT numbers,
 each checksum-, parser-, format- or keyword-backed and under its own code.

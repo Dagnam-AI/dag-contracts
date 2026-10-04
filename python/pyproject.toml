@@ -1,6 +1,6 @@
 [project]
 name = "dagnam-contracts"
-version = "0.4.0"
+version = "0.4.1"
 description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -64,6 +64,20 @@ packages = ["dagnam_contracts"]
 # importlib.resources, and the npm package ships the identical bytes so the
 # Studio and the wheel price the same audit the same way.
 "dagnam_contracts/audit/serving-rates.json" = "dagnam_contracts/audit/serving-rates.json"
+
+# The sdist is the source tree minus what .gitignore names, and local tool state
+# (Hypothesis's example database, the pytest and ruff caches, coverage output) is not
+# all ignored: none of it belongs in a published archive.
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".hypothesis",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".coverage",
+    "htmlcov",
+    "coverage.json",
+    "coverage.xml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

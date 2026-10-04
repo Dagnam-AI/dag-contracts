@@ -50,7 +50,7 @@ def test_frontier_none_when_nothing_clears_the_floor() -> None:
 
 
 def test_unreliable_error_share_is_the_shipped_value() -> None:
-    """Task 8 reads this from the contract; dag-lib steps_serve.py pinned 0.10."""
+    """The SDK reads this from the contract; it used to pin its own 0.10."""
     assert UNRELIABLE_ERROR_SHARE == 0.10
 
 
@@ -66,7 +66,7 @@ def test_frontier_breaks_a_full_tie_on_kind_whatever_the_order() -> None:
 
 
 def test_unreliable_error_share_is_defined_once() -> None:
-    """C5: the report, the SDK and the platform read one threshold; nothing restates it."""
+    """The report, the SDK and the platform read one threshold; nothing restates it."""
     package = Path(verdict.__file__).resolve().parents[1]
     definitions = [
         path.relative_to(package).as_posix()
@@ -90,8 +90,22 @@ def test_frontier_never_picks_a_non_finite_point() -> None:
             assert winner is not None and winner.kind == "sound"
 
 
+def test_frontier_never_picks_a_negative_cost() -> None:
+    """A cost below zero is not a price; it would always be the cheapest. Free is one."""
+    sound = CandidateResult("sound", (0.98, 0.99), 50.0, None)
+    refund = CandidateResult("refund", (0.99, 1.0), -5.0, None)
+    free = CandidateResult("free", (0.99, 1.0), 0.0, None)
+
+    assert frontier([refund], floor=0.95) is None
+    for order in ([refund, sound], [sound, refund]):
+        winner = frontier(order, floor=0.95)
+        assert winner is not None and winner.kind == "sound"
+    winner = frontier([sound, free], floor=0.95)
+    assert winner is not None and winner.kind == "free"
+
+
 def test_frontier_refuses_a_point_that_misses_a_whole_class() -> None:
-    """Q4: a label point needs min_class_recall >= 0.5 when it has one; None is no claim."""
+    """A label point needs min_class_recall >= 0.5 when it has one; None is no claim."""
     assert (MIN_CLASS_RECALL_FLOOR, MIN_CLASS_SUPPORT) == (0.5, 5)
     blind = CandidateResult("head_tune", (0.98, 1.0), 1.0, None, min_class_recall=0.0)
     nan = CandidateResult("nan", (0.98, 1.0), 1.0, None, min_class_recall=math.nan)
@@ -106,7 +120,7 @@ def test_frontier_refuses_a_point_that_misses_a_whole_class() -> None:
 
 
 def test_the_npm_package_ships_the_same_class_recall_constants() -> None:
-    """B7: the Studio hand-copied the floor; the tarball now carries it, held equal here."""
+    """The Studio hand-copied the floor; the tarball now carries it, held equal here."""
     source = (Path(verdict.__file__).resolve().parents[3] / "npm" / "src" / "audit.ts").read_text()
     shipped = dict(re.findall(r"export const (MIN_CLASS_\w+) = ([\d.]+);", source))
     assert shipped == {

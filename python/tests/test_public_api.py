@@ -70,6 +70,7 @@ EXPECTED_EXPORTS = [
     "parse_chat_prompt",
     "ratio_status",
     "redact_json_text",
+    "redact_rows",
     "render_chat_prompt",
     "render_switch_snippet",
     "row_text",

@@ -45,7 +45,7 @@ describe("serving rates", () => {
     expect(SERVING_RATES.rates["cpu-classifier"].usd_per_1k_requests).toBe(
       0.0023,
     );
-    // An A10G on Modal, the machine that serves (R2-6); it priced a T4 at 1.95.
+    // An A10G on Modal, the machine that serves; it priced a T4 at 1.95.
     expect(SERVING_RATES.rates["gpu-small-llm"].usd_per_m_output_tokens).toBe(
       4.08,
     );

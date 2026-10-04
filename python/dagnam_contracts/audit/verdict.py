@@ -88,8 +88,8 @@ def frontier(points: Sequence[CandidateResult], *, floor: float) -> Winner | Non
 
     Ties go to the more certain point, then to ``kind`` ascending, so the choice
     never depends on the order of ``points``; a point whose cost or lower bound
-    is not finite is never chosen, nor one whose ``min_class_recall`` is below
-    :data:`MIN_CLASS_RECALL_FLOOR`. This is the bare rule over bare points, one
+    is not finite, or whose cost is negative, is never chosen, nor one whose
+    ``min_class_recall`` is below :data:`MIN_CLASS_RECALL_FLOOR`. This is the bare rule over bare points, one
     floor for all of them. A report's winner is
     :func:`~dagnam_contracts.audit.report.winner_of`, which also holds each
     candidate to its own floor, skips unreliable ones and breaks ties on the
@@ -99,6 +99,7 @@ def frontier(points: Sequence[CandidateResult], *, floor: float) -> Winner | Non
         p
         for p in points
         if math.isfinite(p.cost_usd_month)
+        and p.cost_usd_month >= 0
         and math.isfinite(p.ci[0])
         and p.ci[0] >= floor
         and (p.min_class_recall is None or p.min_class_recall >= MIN_CLASS_RECALL_FLOOR)

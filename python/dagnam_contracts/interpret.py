@@ -20,7 +20,7 @@ _PADDING_SHAPE = "{mode:'same'|'valid'|'explicit', value?}"
 
 # Severity -> diagnostic type. Error-severity keeps the historical
 # ``parameter_error`` type; advisory severities get distinct types that are NOT
-# spec rule ids, so they stay out of the count-stable corpus and never block.
+# validation rule ids, so they stay out of the count-stable corpus and never block.
 _SEVERITY_TYPE = {
     "error": "parameter_error",
     "warning": "parameter_warning",
@@ -32,7 +32,7 @@ _SEVERITY_TYPE = {
 class ParamError:
     """A single declarative-parameter validation failure.
 
-    Carries the structured diagnostic payload (spec §6) rendered from the same
+    Carries the structured diagnostic payload rendered from the same
     shipped catalog the backend and frontend use, so all three runtimes emit
     byte-identical messages.
     """

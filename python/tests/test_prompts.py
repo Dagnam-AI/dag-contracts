@@ -12,7 +12,7 @@ from dagnam_contracts.prompts import parse_chat_prompt, render_chat_prompt
 
 
 def test_render_chat_prompt_is_byte_exact_and_keeps_assistant_turns_as_context() -> None:
-    """R1-N5: an assistant turn is context for the turns after it; until 0.4.0 it
+    """An assistant turn is context for the turns after it; until 0.4.0 it
     was dropped, so a mid-loop tool result answered a call the model never saw."""
     text = render_chat_prompt(
         [
@@ -169,7 +169,7 @@ def test_arguments_nested_past_the_parser_stay_text() -> None:
 
 
 def test_typed_content_parts_render_as_their_text() -> None:
-    """B6: OpenAI content parts flatten to their text, as the serving bridge does;
+    """OpenAI content parts flatten to their text, as the serving bridge does;
     since the signature widened, a list used to raise TypeError."""
     text = render_chat_prompt(
         [

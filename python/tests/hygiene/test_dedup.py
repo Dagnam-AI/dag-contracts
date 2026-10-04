@@ -11,7 +11,7 @@ Covers:
 
 from __future__ import annotations
 
-from hypothesis import given, settings as hypothesis_settings, strategies as st
+from hypothesis import HealthCheck, given, settings as hypothesis_settings, strategies as st
 
 from dagnam_contracts.hygiene.dedup import DedupResult, canonical_row_hash, compute_exact_duplicates
 
@@ -74,9 +74,13 @@ _ROW_STRATEGY = st.dictionaries(
 
 _ROWS_STRATEGY = st.lists(_ROW_STRATEGY, min_size=0, max_size=25)
 
+# A cold example cache builds Hypothesis's Unicode tables inside the first example (a one-off,
+# not a slow strategy), which trips `too_slow` and nothing else.
+_COLD_CACHE = hypothesis_settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
+
 
 @given(rows=_ROWS_STRATEGY)
-@hypothesis_settings(max_examples=100)
+@_COLD_CACHE
 def test_dedup_is_idempotent(rows: list[dict[str, object]]) -> None:
     """Re-running dedup on the kept rows must find nothing further."""
     first = compute_exact_duplicates(rows)
@@ -88,7 +92,7 @@ def test_dedup_is_idempotent(rows: list[dict[str, object]]) -> None:
 @given(
     rows=st.lists(_ROW_STRATEGY, min_size=1, max_size=25, unique_by=lambda r: canonical_row_hash(r))
 )
-@hypothesis_settings(max_examples=100)
+@_COLD_CACHE
 def test_dedup_no_false_merge_on_distinct_content(rows: list[dict[str, object]]) -> None:
     """Genuinely distinct content must never be flagged as a duplicate."""
     result = compute_exact_duplicates(rows)

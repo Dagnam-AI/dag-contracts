@@ -51,7 +51,7 @@ class Agreement:
     min_class_recall: float | None = None
 
     def to_json(self) -> dict[str, JsonValue]:
-        """The ``agreement`` object of ``audit-report.json`` (spec section 7).
+        """The ``agreement`` object of ``audit-report.json``.
 
         A label block (``metric: "exact"``) always carries ``min_class_recall``,
         ``null`` when no class had the support to count.
