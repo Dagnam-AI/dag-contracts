@@ -11,9 +11,18 @@
  * JSON cannot carry (and the cap), not the field rules.
  *
  * Integer fields and `latency_ms` stay within 2**53 - 1 (the JavaScript safe-integer range).
- * JSON.parse cannot tell `2.0` from `2`, `1e2` from `100` or a 400-digit integer from Infinity, so
- * the Python reader is stricter on those spellings; the shared cases it alone can tell apart are
- * marked `python_only`.
+ *
+ * Where this reader differs from the Python one, because JSON.parse decides first:
+ * - Number spellings JSON.parse cannot tell apart are read as integers: `2.0`, `1e2`,
+ *   `200.00000000000000001` and `9007199254740990.9` all become whole numbers, where Python sees a
+ *   float and rejects it. The shared cases only Python can tell apart are marked `python_only`.
+ * - A 400-digit `v` or `norm_v` becomes Infinity and is reported as `EnvelopeError`, not
+ *   `UnsupportedEnvelopeVersion`.
+ * - A text line nested ~1000+ levels deep is accepted (JSON.parse and the walker are iterative),
+ *   where Python rejects it with a RecursionError reported as "not JSON". Re-encoding an absurdly
+ *   deep body still raises `EnvelopeError`.
+ * - Integers inside `request`/`response` are not range-checked (the raw body is kept as sent), so
+ *   one above 2**53 loses precision on re-encode.
  */
 
 export const ENVELOPE_VERSION = 1;
@@ -329,7 +338,8 @@ export function parseEnvelope(line: string | object): TraceEnvelope {
   };
 }
 
-export function encodeEnvelope(envelope: TraceEnvelope): string {
+/** The wire object for an envelope; throws a TypeError if the envelope is not shaped like one. */
+function wire(envelope: TraceEnvelope): Obj {
   const out: Obj = {
     v: envelope.v,
     trace_id: envelope.trace_id,
@@ -357,6 +367,16 @@ export function encodeEnvelope(envelope: TraceEnvelope): string {
       has_media: n.has_media,
     };
     out["norm_v"] = envelope.norm_v;
+  }
+  return out;
+}
+
+export function encodeEnvelope(envelope: TraceEnvelope): string {
+  let out: Obj;
+  try {
+    out = wire(envelope);
+  } catch {
+    throw new EnvelopeError("envelope is not shaped like a TraceEnvelope");
   }
   // JSON.stringify would turn NaN into null and escape (not reject) a lone surrogate, so walk first.
   checkJson(out);
