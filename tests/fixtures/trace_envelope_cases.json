@@ -48,7 +48,53 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "raw_only",
@@ -82,7 +128,38 @@
       }
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": null,
+      "norm_v": null
+    }
   },
   {
     "name": "norm_only",
@@ -113,7 +190,35 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "other",
+      "endpoint": "custom",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": null,
+      "response": null,
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "norm_only_null_bodies",
@@ -146,7 +251,35 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": null,
+      "response": null,
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "norm_optional_fields_default",
@@ -194,7 +327,53 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": null,
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "norm_with_tool_calls_and_media",
@@ -238,9 +417,11 @@
         "response": "Hello",
         "tool_calls": [
           {
-            "id": "call_1",
-            "name": "f",
-            "arguments": "{}"
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            }
           }
         ],
         "prompt_tokens": 9,
@@ -251,7 +432,371 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 4,
+        "has_media": true
+      },
+      "norm_v": 1
+    }
+  },
+  {
+    "name": "norm_tool_call_extra_keys_are_kept",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            },
+            "id": "call_1"
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": true,
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            },
+            "id": "call_1"
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
+  },
+  {
+    "name": "norm_message_extra_keys_are_dropped",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi",
+            "name": "u1"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": true,
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
+  },
+  {
+    "name": "norm_empty_message_content",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": ""
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": true,
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "assistant",
+            "content": ""
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "anthropic_messages",
@@ -302,7 +847,53 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "anthropic",
+      "endpoint": "messages",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "openai_responses",
@@ -353,7 +944,53 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "responses",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "integer_latency",
@@ -404,7 +1041,53 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 0.0,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "unknown_top_level_key_is_ignored",
@@ -458,7 +1141,53 @@
       }
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
   },
   {
     "name": "failed_call_status_429",
@@ -486,7 +1215,32 @@
       }
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 429,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "error": {
+          "type": "rate_limit"
+        }
+      },
+      "norm": null,
+      "norm_v": null
+    }
   },
   {
     "name": "unicode_content",
@@ -537,7 +1291,216 @@
       "norm_v": 1
     },
     "ok": true,
-    "error": null
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "héllo 你好",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
+  },
+  {
+    "name": "ts_without_fraction",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": true,
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    }
+  },
+  {
+    "name": "norm_v_ignored_without_norm",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm_v": 2
+    },
+    "ok": true,
+    "error": null,
+    "expect": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": null,
+      "norm_v": null
+    }
   },
   {
     "name": "version_2",
@@ -641,9 +1604,111 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "version_null",
+    "line": {
+      "v": null,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "version_zero",
     "line": {
       "v": 0,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "version_negative",
+    "line": {
+      "v": -1,
       "trace_id": "01JTRACE0000000000000000A1",
       "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
@@ -794,6 +1859,110 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "version_float_2_0",
+    "line": {
+      "v": 2.0,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError",
+    "python_only": true
+  },
+  {
+    "name": "version_float_1_0",
+    "line": {
+      "v": 1.0,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError",
+    "python_only": true
+  },
+  {
     "name": "neither_norm_nor_raw",
     "line": {
       "v": 1,
@@ -856,6 +2025,131 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "request_without_response_with_norm",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "response_without_request_with_norm",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "request_null_response_object_with_norm",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": null,
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "request_not_an_object",
     "line": {
       "v": 1,
@@ -895,6 +2189,119 @@
         "cached_prompt_tokens": 0,
         "has_media": false
       },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "response_not_an_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": "x",
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_not_an_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": "x",
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_empty_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {},
       "norm_v": 1
     },
     "ok": false,
@@ -951,7 +2358,58 @@
     "error": "EnvelopeError"
   },
   {
-    "name": "norm_v_not_an_integer",
+    "name": "norm_v_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": null
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_v_string",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
@@ -1053,7 +2511,7 @@
     "error": "EnvelopeError"
   },
   {
-    "name": "norm_not_an_object",
+    "name": "norm_v_zero",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
@@ -1082,11 +2540,218 @@
           }
         ]
       },
-      "norm": "x",
-      "norm_v": 1
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 0
     },
     "ok": false,
     "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_v_negative",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": -1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_v_2",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 2
+    },
+    "ok": false,
+    "error": "UnsupportedEnvelopeVersion"
+  },
+  {
+    "name": "norm_v_2_with_unknown_norm_shape",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "future": true
+      },
+      "norm_v": 2
+    },
+    "ok": false,
+    "error": "UnsupportedEnvelopeVersion"
+  },
+  {
+    "name": "norm_v_float_1_0",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1.0
+    },
+    "ok": false,
+    "error": "EnvelopeError",
+    "python_only": true
   },
   {
     "name": "norm_messages_not_a_list",
@@ -1122,6 +2787,51 @@
         "model": "gpt-4o-mini",
         "system": "Be brief.",
         "messages": {},
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_messages_missing",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
         "response": "Hello",
         "tool_calls": [],
         "prompt_tokens": 9,
@@ -1186,6 +2896,57 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "norm_tool_calls_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": null,
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "norm_message_missing_content",
     "line": {
       "v": 1,
@@ -1221,6 +2982,56 @@
         "messages": [
           {
             "role": "user"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_missing_role",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "content": "Hi"
           }
         ],
         "response": "Hello",
@@ -1273,6 +3084,1116 @@
         ],
         "response": "Hello",
         "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_content_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": null
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_content_list",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi"
+              }
+            ]
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_content_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": {
+              "text": "Hi"
+            }
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_content_number",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": 5
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_role_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": null,
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_message_role_number",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": 1,
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_string",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          "ab"
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_number",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          5
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          null
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_list",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          [
+            {
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\":\"Oslo\"}"
+              }
+            }
+          ]
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_empty_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {}
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_missing_type",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_wrong_type",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "tool_use",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_missing_function",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function"
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_function_not_an_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": "f"
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_name_missing",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "arguments": "{}"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_name_not_a_string",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": 1,
+              "arguments": "{}"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_arguments_missing",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "f"
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_arguments_an_object",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "f",
+              "arguments": {
+                "a": 1
+              }
+            }
+          }
+        ],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_tool_call_second_entry_bad",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"Oslo\"}"
+            }
+          },
+          5
+        ],
         "prompt_tokens": 9,
         "completion_tokens": 2,
         "cached_prompt_tokens": 0,
@@ -1437,6 +4358,210 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "norm_model_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": null,
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_has_media_string",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": "yes"
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_has_media_number",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": 1
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_has_media_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": null
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "norm_prompt_tokens_missing",
     "line": {
       "v": 1,
@@ -1477,6 +4602,57 @@
         ],
         "response": "Hello",
         "tool_calls": [],
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_prompt_tokens_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": null,
         "completion_tokens": 2,
         "cached_prompt_tokens": 0,
         "has_media": false
@@ -1529,6 +4705,57 @@
         "tool_calls": [],
         "prompt_tokens": -1,
         "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_completion_tokens_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": null,
         "cached_prompt_tokens": 0,
         "has_media": false
       },
@@ -1640,6 +4867,57 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "norm_cached_prompt_tokens_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": null,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "norm_cached_prompt_tokens_negative",
     "line": {
       "v": 1,
@@ -1683,6 +4961,57 @@
         "prompt_tokens": 9,
         "completion_tokens": 2,
         "cached_prompt_tokens": -1,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "norm_response_has_lone_surrogate",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "\ud800",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
         "has_media": false
       },
       "norm_v": 1
@@ -1797,6 +5126,312 @@
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": null,
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_date_only",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_compact_form",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "20261012T093000Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_impossible_date",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-02-30T00:00:00Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_hour_24",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T24:00:00Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "ts_lowercase_z",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00z",
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": 812.5,
@@ -1995,10 +5630,163 @@
     "error": "EnvelopeError"
   },
   {
+    "name": "provider_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": null,
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "endpoint_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": null,
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
     "name": "trace_id_empty",
     "line": {
       "v": 1,
       "trace_id": "",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": 812.5,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "trace_id_null",
+    "line": {
+      "v": 1,
+      "trace_id": null,
       "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
       "endpoint": "chat.completions",
@@ -2207,6 +5995,57 @@
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": true,
+      "status": 200,
+      "request": {
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-1",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Hello"
+            }
+          }
+        ]
+      },
+      "norm": {
+        "model": "gpt-4o-mini",
+        "system": "Be brief.",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hi"
+          }
+        ],
+        "response": "Hello",
+        "tool_calls": [],
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "cached_prompt_tokens": 0,
+        "has_media": false
+      },
+      "norm_v": 1
+    },
+    "ok": false,
+    "error": "EnvelopeError"
+  },
+  {
+    "name": "latency_null",
+    "line": {
+      "v": 1,
+      "trace_id": "01JTRACE0000000000000000A1",
+      "ts": "2026-10-12T09:30:00.125Z",
+      "provider": "openai",
+      "endpoint": "chat.completions",
+      "latency_ms": null,
       "status": 200,
       "request": {
         "model": "gpt-4o-mini",
@@ -2504,66 +6343,15 @@
     "error": "EnvelopeError"
   },
   {
-    "name": "ts_without_fraction",
+    "name": "status_null",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
-      "ts": "2026-10-12T09:30:00Z",
+      "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": 812.5,
-      "status": 200,
-      "request": {
-        "model": "gpt-4o-mini",
-        "messages": [
-          {
-            "role": "user",
-            "content": "Hi"
-          }
-        ]
-      },
-      "response": {
-        "id": "chatcmpl-1",
-        "choices": [
-          {
-            "message": {
-              "role": "assistant",
-              "content": "Hello"
-            }
-          }
-        ]
-      },
-      "norm": {
-        "model": "gpt-4o-mini",
-        "system": "Be brief.",
-        "messages": [
-          {
-            "role": "user",
-            "content": "Hi"
-          }
-        ],
-        "response": "Hello",
-        "tool_calls": [],
-        "prompt_tokens": 9,
-        "completion_tokens": 2,
-        "cached_prompt_tokens": 0,
-        "has_media": false
-      },
-      "norm_v": 1
-    },
-    "ok": true,
-    "error": null
-  },
-  {
-    "name": "ts_date_only",
-    "line": {
-      "v": 1,
-      "trace_id": "01JTRACE0000000000000000A1",
-      "ts": "2026-10-12Z",
-      "provider": "openai",
-      "endpoint": "chat.completions",
-      "latency_ms": 812.5,
-      "status": 200,
+      "status": null,
       "request": {
         "model": "gpt-4o-mini",
         "messages": [
@@ -2606,15 +6394,15 @@
     "error": "EnvelopeError"
   },
   {
-    "name": "ts_compact_form",
+    "name": "status_float_200_0",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
-      "ts": "20261012T093000Z",
+      "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": 812.5,
-      "status": 200,
+      "status": 200.0,
       "request": {
         "model": "gpt-4o-mini",
         "messages": [
@@ -2654,26 +6442,21 @@
       "norm_v": 1
     },
     "ok": false,
-    "error": "EnvelopeError"
+    "error": "EnvelopeError",
+    "python_only": true
   },
   {
-    "name": "ts_impossible_date",
+    "name": "lone_surrogate_in_request_value",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
-      "ts": "2026-02-30T00:00:00Z",
+      "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": 812.5,
       "status": 200,
       "request": {
-        "model": "gpt-4o-mini",
-        "messages": [
-          {
-            "role": "user",
-            "content": "Hi"
-          }
-        ]
+        "model": "\ud800"
       },
       "response": {
         "id": "chatcmpl-1",
@@ -2708,23 +6491,17 @@
     "error": "EnvelopeError"
   },
   {
-    "name": "ts_lowercase_z",
+    "name": "lone_surrogate_in_request_key",
     "line": {
       "v": 1,
       "trace_id": "01JTRACE0000000000000000A1",
-      "ts": "2026-10-12T09:30:00z",
+      "ts": "2026-10-12T09:30:00.125Z",
       "provider": "openai",
       "endpoint": "chat.completions",
       "latency_ms": 812.5,
       "status": 200,
       "request": {
-        "model": "gpt-4o-mini",
-        "messages": [
-          {
-            "role": "user",
-            "content": "Hi"
-          }
-        ]
+        "\ud800": 1
       },
       "response": {
         "id": "chatcmpl-1",
