@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
+## [0.5.0] - 2026-10-23
+
+### Added
+
+- **`dagnam_contracts.trace` and `@dagnam/contracts` `trace`: trace envelope v1.**
+  The one-line JSON record that recorders write and readers parse, defined once
+  so every producer and consumer agrees on what a valid line is. Both packages
+  ship the types (`TraceEnvelope`, `Norm`, `NormMessage`), a parser
+  (`parse_envelope` / `parseEnvelope`) and an encoder (`encode_envelope` /
+  `encodeEnvelope`), the constants (`ENVELOPE_VERSION`, `NORM_VERSION`,
+  `MAX_LINE_BYTES`, `ENDPOINTS`, `PROVIDERS`) and the errors (`EnvelopeError`,
+  `UnsupportedEnvelopeVersion`). Both interpreters run the same shared cases
+  (`tests/fixtures/trace_envelope_cases.json`), so they accept and reject the
+  same lines.
+
 ## [0.4.1] - 2026-10-04
 
 ### Fixed

@@ -136,6 +136,11 @@ finds a password in a URL or after `pwd=`. `CHANGELOG.md` lists where it answers
 differently from 0.4.0, what upgrading means for a client and a platform on
 different versions, and the known limits.
 
+0.5.0 adds `trace`, the trace envelope v1 contract: the one-line JSON record a
+recorder writes and a reader parses, as types, a parser and an encoder in both
+packages (`dagnam_contracts.trace`, `@dagnam/contracts`), checked against one set
+of shared cases. `CHANGELOG.md` has the details.
+
 ## Releasing
 
 One tag publishes both packages from one source, so they can never be published
