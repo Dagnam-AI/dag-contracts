@@ -2,6 +2,13 @@
 
 Unknown top-level keys are ignored on parse and are not preserved on encode. Every failure on bad
 input is an ``EnvelopeError`` (``UnsupportedEnvelopeVersion`` for a newer ``v`` or ``norm_v``).
+
+The line cap applies to a ``str``/``bytes`` line; a ``Mapping`` passed to ``parse_envelope`` has no
+size cap. ``encode_envelope`` assumes an envelope that came from ``parse_envelope``: it only guards
+against what JSON cannot carry (and the cap), not the field rules.
+
+Integer fields and ``latency_ms`` stay within 2**53 - 1, the largest integer a JavaScript number
+holds exactly, so the TypeScript mirror reads the same values.
 """
 
 from __future__ import annotations
@@ -17,6 +24,7 @@ from typing import Any, Final, Never, TypeGuard, cast
 ENVELOPE_VERSION: Final = 1
 NORM_VERSION: Final = 1
 MAX_LINE_BYTES: Final = 1_000_000
+MAX_SAFE_INTEGER: Final = 2**53 - 1
 PROVIDERS: Final = ("openai", "anthropic", "other")
 ENDPOINTS: Final = ("chat.completions", "responses", "messages", "custom")
 
@@ -78,9 +86,20 @@ def _check_text(value: str) -> None:
 
 def _check_json(root: object) -> None:
     """Reject anything a JSON line cannot carry: NaN/Infinity, lone surrogates, non-JSON types."""
-    stack = [root]
+    # Depth-first with an explicit stack; ``on_path`` holds the containers being walked, so a
+    # container that contains itself is a cycle, while one referenced twice side by side is fine.
+    stack: list[tuple[object, bool]] = [(root, False)]
+    on_path: set[int] = set()
     while stack:
-        value = stack.pop()
+        value, leaving = stack.pop()
+        if leaving:
+            on_path.discard(id(value))
+            continue
+        if isinstance(value, (Mapping, list)):
+            if id(value) in on_path:
+                raise EnvelopeError("an envelope cannot contain a cycle")
+            on_path.add(id(value))
+            stack.append((value, True))
         if isinstance(value, str):
             _check_text(value)
         elif isinstance(value, float):
@@ -91,9 +110,9 @@ def _check_json(root: object) -> None:
                 if not isinstance(key, str):
                     raise EnvelopeError("object keys must be strings")
                 _check_text(key)
-                stack.append(item)
+                stack.append((item, False))
         elif isinstance(value, list):
-            stack.extend(cast("list[object]", value))
+            stack.extend((item, False) for item in cast("list[object]", value))
         elif value is not None and not isinstance(value, int):
             raise EnvelopeError("values must be JSON values")
 
@@ -139,8 +158,8 @@ def _str(obj: Mapping[str, Any], key: str) -> str:
 
 def _int(obj: Mapping[str, Any], key: str) -> int:
     value = obj.get(key)
-    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-        raise EnvelopeError(f"{key} must be a non-negative integer")
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= MAX_SAFE_INTEGER:
+        raise EnvelopeError(f"{key} must be an integer from 0 to 2**53 - 1")
     return value
 
 
@@ -174,7 +193,7 @@ def _norm_version(obj: Mapping[str, Any]) -> int:
     if not _is_int(value):
         raise EnvelopeError("norm needs an integer norm_v")
     if value > NORM_VERSION:
-        raise UnsupportedEnvelopeVersion(f"norm_v {value} is newer than {NORM_VERSION}")
+        raise UnsupportedEnvelopeVersion("norm_v is newer than this reader understands")
     if value != NORM_VERSION:
         raise EnvelopeError(f"norm_v must be {NORM_VERSION}")
     return NORM_VERSION
@@ -226,7 +245,7 @@ def _check_version(obj: Mapping[str, Any]) -> None:
     if not _is_int(version):
         raise EnvelopeError("v must be the integer 1")
     if version > ENVELOPE_VERSION:
-        raise UnsupportedEnvelopeVersion(f"envelope v{version} is newer than v{ENVELOPE_VERSION}")
+        raise UnsupportedEnvelopeVersion("envelope version is newer than this reader understands")
     if version != ENVELOPE_VERSION:
         raise EnvelopeError("v must be 1")
 
@@ -249,12 +268,11 @@ def parse_envelope(line: str | bytes | bytearray | Mapping[str, Any]) -> TraceEn
     latency = obj.get("latency_ms")
     if isinstance(latency, bool) or not isinstance(latency, (int, float)):
         raise EnvelopeError("latency_ms must be a number")
-    try:
-        latency_ms = float(latency)
-    except OverflowError as exc:
-        raise EnvelopeError("latency_ms is out of range") from exc
-    if not math.isfinite(latency_ms) or latency_ms < 0:
-        raise EnvelopeError("latency_ms must be finite and non-negative")
+    # Compared as given (int vs float is exact in Python) so a huge int cannot overflow float().
+    # The sign check catches -0.0, which compares equal to 0 but would print as "-0.0".
+    if not 0 <= latency <= MAX_SAFE_INTEGER or math.copysign(1.0, latency) < 0:
+        raise EnvelopeError("latency_ms must be a finite, non-negative number up to 2**53 - 1")
+    latency_ms = float(latency)
     status = _int(obj, "status")
     if not 100 <= status <= 599:
         raise EnvelopeError("status must be an HTTP status")

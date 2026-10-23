@@ -276,3 +276,77 @@ def test_raw_only_encodes_without_norm() -> None:
     assert "norm" not in encoded
     assert "norm_v" not in encoded
     assert encoded["request"] == FIRST["request"]
+
+
+@pytest.mark.parametrize(
+    "huge",
+    [10**5000, -(10**5000), 10**400],
+    ids=["5000-digits", "negative-5000-digits", "400-digits"],
+)
+@pytest.mark.parametrize("field", ["v", "norm_v"])
+def test_huge_version_numbers_raise_only_envelope_errors(field: str, huge: int) -> None:
+    # Formatting an int past 4300 digits raises a bare ValueError, so messages must omit it.
+    with pytest.raises(EnvelopeError) as caught:
+        parse_envelope({**FIRST, field: huge})
+    assert type(caught.value) is (UnsupportedEnvelopeVersion if huge > 1 else EnvelopeError)
+    assert "digits" not in str(caught.value)
+
+
+class _Runaway(dict[str, Any]):
+    """A dict whose ``items()`` is bounded, so a missing cycle guard fails fast instead of hanging."""
+
+    calls = 0
+
+    def items(self) -> Any:
+        type(self).calls += 1
+        assert type(self).calls < 10_000, "walker looped: no cycle guard"
+        return super().items()
+
+
+class _RunawayList(list[Any]):
+    calls = 0
+
+    def __iter__(self) -> Any:
+        type(self).calls += 1
+        assert type(self).calls < 10_000, "walker looped: no cycle guard"
+        return super().__iter__()
+
+
+def test_parse_rejects_a_cyclic_mapping_instead_of_hanging() -> None:
+    loop = _Runaway()
+    loop["self"] = loop
+    with pytest.raises(EnvelopeError, match="cycl"):
+        parse_envelope({**FIRST, "request": loop})
+    two_step: dict[str, Any] = {}
+    two_step["child"] = {"back": two_step}
+    with pytest.raises(EnvelopeError, match="cycl"):
+        parse_envelope({**FIRST, "response": two_step})
+
+
+def test_parse_rejects_a_cyclic_list_instead_of_hanging() -> None:
+    loop = _RunawayList()
+    loop.append(loop)
+    with pytest.raises(EnvelopeError, match="cycl"):
+        parse_envelope({**FIRST, "request": {"a": loop}})
+
+
+def test_parse_accepts_one_object_referenced_twice() -> None:
+    shared = {"k": [1, 2]}
+    env = parse_envelope(
+        {**FIRST, "request": {"a": shared, "b": shared}, "response": {"c": shared}}
+    )
+    assert env.request == {"a": {"k": [1, 2]}, "b": {"k": [1, 2]}}
+
+
+@pytest.mark.parametrize(
+    "huge", [2**53, 10**400, -(10**400)], ids=["2**53", "400-digits", "negative-400-digits"]
+)
+def test_latency_beyond_the_safe_range_is_rejected(huge: float) -> None:
+    with pytest.raises(EnvelopeError):
+        parse_envelope({**FIRST, "latency_ms": huge})
+
+
+def test_negative_zero_latency_is_rejected_and_positive_zero_is_not() -> None:
+    with pytest.raises(EnvelopeError):
+        parse_envelope({**FIRST, "latency_ms": -0.0})
+    assert parse_envelope({**FIRST, "latency_ms": 0.0}).latency_ms == 0.0
