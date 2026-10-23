@@ -19,6 +19,18 @@ export {
   SERVING_RATES,
 } from "./audit.js";
 export type { ReferenceModel, ServingRate, ServingRateCard } from "./audit.js";
+export {
+  ENDPOINTS,
+  ENVELOPE_VERSION,
+  EnvelopeError,
+  MAX_LINE_BYTES,
+  NORM_VERSION,
+  PROVIDERS,
+  UnsupportedEnvelopeVersion,
+  encodeEnvelope,
+  parseEnvelope,
+} from "./trace.js";
+export type { Norm, NormMessage, ToolCall, TraceEnvelope } from "./trace.js";
 export { PII_CODES } from "./pii.js";
 export type { PiiCode } from "./pii.js";
 export { validateParamsAgainstSchema } from "./schema-param-validation.js";
