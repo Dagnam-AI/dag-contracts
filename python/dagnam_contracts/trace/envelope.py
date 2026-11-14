@@ -258,6 +258,9 @@ def parse_envelope(line: str | bytes | bytearray | Mapping[str, Any]) -> TraceEn
     ts = _str(obj, "ts")
     if not _TS.fullmatch(ts):
         raise EnvelopeError("ts must be a UTC RFC 3339 time ending in Z")
+    # Python 3.14's fromisoformat reads hour 24 as the next midnight; the contract allows 00-23 only.
+    if ts[11:13] == "24":
+        raise EnvelopeError("ts is not a real date and time")
     try:
         datetime.fromisoformat(ts)
     except ValueError as exc:
