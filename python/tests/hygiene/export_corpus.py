@@ -1,6 +1,6 @@
 """Write the reference corpus a port of the hygiene code is pinned to.
 
-Not a test module: ``python tests/hygiene/export_corpus.py <dir>`` writes four JSON
+Not a test module: ``python tests/hygiene/export_corpus.py <dir>`` writes five JSON
 Lines files into ``<dir>``, one case per line, from the inputs the suite already pins
 (`pii_corpus` and the tables it imports) and those in `corpus_inputs`:
 
@@ -10,7 +10,9 @@ Lines files into ``<dir>``, one case per line, from the inputs the suite already
   `corpus_near_dedup`: the texts are already ``row_text`` output;
 * ``findings.jsonl``   -- ``{"text", "spans": [[start, end, code]]}``, offsets in code points;
 * ``credentials.jsonl`` -- ``{"parts", "spans"}``: the texts that hold a credential, as
-  fragments (``"".join(parts)`` is the text), see `corpus_credentials`.
+  fragments (``"".join(parts)`` is the text), see `corpus_credentials`;
+* ``classes.jsonl``    -- one line, ``{"word", "space", "digit": [[lo, hi]]}``: the inclusive
+  code-point ranges Python's ``\\w``, ``\\s`` and ``\\d`` match, see `corpus_classes`.
 
 A text that cannot be encoded as UTF-8 (a lone surrogate) is dropped: it cannot be
 written to a file a port reads. So is every text, in every file, that holds a credential
@@ -32,6 +34,7 @@ import sys
 from typing import Any
 
 from corpus_atoms import HELD_CODE
+from corpus_classes import class_case
 from corpus_credentials import (
     clean_windows,
     combined_texts,
@@ -217,6 +220,7 @@ def build() -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
         "near_dedup.jsonl": near_dedup,
         "findings.jsonl": cases,
         "credentials.jsonl": credentials,
+        "classes.jsonl": [class_case()],
     }
     counts = {"dropped": utf8, **{name[:-6]: len(cases) for name, cases in files.items()}}
     counts.update((f"credentials_{shape}", number) for shape, number in sorted(shapes.items()))
@@ -227,11 +231,14 @@ def build() -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
     by_code = Counter(span[2] for case in cases for span in case["spans"])
     counts.update(sorted(by_code.items()))
     counts["signature_length"] = NUM_PERMUTATIONS
+    counts.update(
+        (f"classes_{name}", len(runs)) for name, runs in files["classes.jsonl"][0].items()
+    )
     return files, counts
 
 
 def export(out: Path) -> dict[str, int]:
-    """Write the four files into ``out``; return how many cases each holds and more."""
+    """Write the five files into ``out``; return how many cases each holds and more."""
     out.mkdir(parents=True, exist_ok=True)
     files, counts = build()
     for name, cases in files.items():
