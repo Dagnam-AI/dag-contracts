@@ -16,7 +16,8 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from corpus_inputs import encodable
+from corpus_inputs import leaves
+from corpus_regions import exportable, leaks
 
 from dagnam_contracts.hygiene.near_dedup import (
     _candidate_pairs,
@@ -41,8 +42,8 @@ def normalised(text: str) -> str:
 
 
 def usable(text: str) -> bool:
-    """A text that is already normalised and can be written to a UTF-8 file."""
-    return encodable(text) and normalised(text) == text
+    """A text that is already normalised, UTF-8 encodable and holds no credential."""
+    return exportable(text) and normalised(text) == text
 
 
 def _signature(text: str) -> tuple[int, ...]:
@@ -140,7 +141,10 @@ def find_chain(generator: random.Random, threshold: float) -> list[str] | None:
 def near_dedup_cases(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Every case, and how many of the searched shapes the searches found."""
     generator = random.Random(20261114)
-    pool = [text for text in (row_text(row) for row in rows) if usable(text)]
+    # A row with a credential in any leaf is dropped, however `row_text` rewrites it.
+    clean = [row for row in rows if not any(leaks(leaf) for leaf in leaves(row))]
+    pool = [text for text in (row_text(row) for row in clean) if usable(text)]
+    leaking_rows = len(rows) - len(clean)
     cases: list[dict[str, Any]] = []
     for index in range(GROUPS):
         group = pool[index * GROUP : (index + 1) * GROUP]
@@ -171,5 +175,10 @@ def near_dedup_cases(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
     cases += _every_threshold(
         ["a", "a", "a b", "a b", "b a", "hello", "hello world", "world hello", "a b c", "a b c d"]
     )
-    found = {"chains": len(chains), "band_misses": len(misses), "dyadic_pairs": int(bool(dyadic))}
+    found = {
+        "chains": len(chains),
+        "band_misses": len(misses),
+        "dyadic_pairs": int(bool(dyadic)),
+        "dropped_flagged_near_dedup": leaking_rows,
+    }
     return cases, found
