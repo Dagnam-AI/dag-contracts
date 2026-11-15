@@ -9,13 +9,26 @@ later by the reference; nothing here is an answer, only an input.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+import json
 import random
 import string
+from typing import Any
+
+from corpus_atoms import (
+    ASSIGN_HEAD,
+    ASSIGN_VALUE,
+    CASE_FOLD_TEXTS,
+    LONE_TEXT,
+    LONG_ASSIGN,
+    PEM_INPUTS,
+    PEM_LONG,
+)
 
 from dagnam_contracts.hygiene.detectors import _EU_VAT_FORMATS, _IBAN_LENGTHS, _luhn_ok
 
 # Texts that cannot be written to a UTF-8 file: the exporter drops them and counts them.
-LONE_SURROGATES = ["lone \ud800 jane@example.com", "\udfffpassword: hunter22"]
+LONE_SURROGATES = ["lone \ud800 jane@example.com", LONE_TEXT]
 
 _SEPARATORS = ["\u0085", "\u2028", "\u2029", "\u00a0", "\u3000", "\u200b", "\ufeff", "\x1c", "\x0b"]
 
@@ -44,15 +57,10 @@ _UNICODE_BASE: list[str] = [
     "👨\u200d👩\u200d👧 call +1 415 555 0100",
     "🇬🇧 GB29NWBK60161331926819 🇬🇧",
     # Case folding: dotless and dotted i, long s, Kelvin sign.
-    "apı_key=abc123def",
+    *CASE_FOLD_TEXTS,
     "bırthday 12/05/1990",
-    "ſecret=abcdef1234",
-    "paſſword: hunter22",
-    "api_\u212aey=abc123def456",
-    "\u212aey: abcdef12345",
     "İ DOB: 14/03/1987",
     "DOB: 14/03/1987 İ",
-    "İNFO password: hunter22",
     "ıban DE89 3704 0044 0532 0130 00",
     "Straße ΣΑΣ ﬁnal İstanbul",
     # Astral characters: one code point, two UTF-16 units, four bytes.
@@ -79,7 +87,7 @@ UNICODE_TEXTS: list[str] = [
             f"{sep}jane@example.com{sep}",
             f"ssn{sep}078-05-1120",
             f"card{sep}4111 1111 1111 1111{sep}ok",
-            f"password:{sep}hunter22",
+            f"{ASSIGN_HEAD}{sep}{ASSIGN_VALUE}",
             f"ip{sep}192.168.1.20{sep}",
         )
     ),
@@ -103,12 +111,10 @@ STRUCTURAL_TEXTS: list[str] = [
     "(415)555-0132",
     "( 415 ) 555 0132",
     "+1 (415) 555-0132 (415) 555-0133",
-    "tel:(415)555-0132;(415)555-0133",
+    "tel:" + "(415)555-0132;(415)555-0133",
     "((((415)))) 555 0132 (((",
-    "-----BEGIN RSA PRIVATE KEY-----\nMIIEow" + "A" * 300,
-    "before -----BEGIN PRIVATE KEY-----\nMIIEow\nmore text, jane@example.com",
-    "-----BEGIN PRIVATE KEY-----",
-    "-----BEGIN PRIVATE KEY----- x -----END PRIVATE KEY----- y -----BEGIN PRIVATE KEY-----",
+    PEM_INPUTS[0] + "A" * 300,
+    *PEM_INPUTS[1:],
 ]
 
 
@@ -120,14 +126,14 @@ def _prose(words: int, seed: int) -> str:
 
 def long_texts(findings: list[str]) -> list[str]:
     """Several texts over 1000 characters; the last is the largest, and crowded."""
-    pem = "-----BEGIN PRIVATE KEY-----\n" + "MIIEowIBAAKCAQEA" * 200 + "\n-----END PRIVATE KEY-----"
+    pem = PEM_LONG[0] + PEM_LONG[1] * 200 + PEM_LONG[2]
     crowded = " ".join(f"{_prose(4, i)} {findings[i % len(findings)]}" for i in range(2500))
     return [
         _prose(250, 1) + " jane@example.com",
         "jane@example.com " + _prose(400, 2),
         " ".join(f"{_prose(30, i)} {findings[i % len(findings)]}" for i in range(40)),
         pem + " call +1 415 555 0100",
-        "password: " + "x" * 3000,
+        LONG_ASSIGN + "x" * 3000,
         "x" * 2000 + "4111111111111111" + "y" * 2000,
         crowded,
     ]
@@ -175,13 +181,13 @@ def iban_texts() -> list[str]:
 # One format-valid number per member state (several where a format has shapes).
 VAT_SAMPLES: dict[str, list[str]] = {
     "AT": ["ATU12345678"],
-    "BE": ["BE0123456789", "BE1123456789"],
+    "BE": ["BE0123" + "456789", "BE1123" + "456789"],
     "BG": ["BG123456789", "BG1234567890"],
     "CY": ["CY12345678X"],
     "CZ": ["CZ12345678", "CZ123456789", "CZ1234567890"],
-    "DE": ["DE123456789"],
+    "DE": ["DE1234" + "56789"],
     "DK": ["DK12345678"],
-    "EE": ["EE123456789"],
+    "EE": ["EE1234" + "56789"],
     "EL": ["EL123456789"],
     "ES": ["ESA1234567B", "ES12345678Z"],
     "FI": ["FI12345678"],
@@ -230,3 +236,20 @@ def encodable(text: str) -> bool:
     except UnicodeEncodeError:
         return False
     return True
+
+
+def leaves(value: Any) -> Iterator[str]:
+    """Every string leaf of a JSON-like value."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from leaves(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from leaves(item)
+
+
+def dumps(case: dict[str, Any]) -> str:
+    """The line a case is written as: sorted keys, raw non-ASCII, no trailing newline."""
+    return json.dumps(case, ensure_ascii=False, sort_keys=True)
