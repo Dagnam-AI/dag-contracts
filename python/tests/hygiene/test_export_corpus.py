@@ -1,14 +1,16 @@
 from collections import Counter
 from collections.abc import Iterator
-from itertools import combinations
+from itertools import combinations, pairwise
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import Any
 
 from corpus_atoms import HELD_CODE, TEST_MARKERS
+from corpus_classes import CLASSES, LAST, SURROGATES
 from corpus_inputs import LONE_SURROGATES, VAT_SAMPLES, iban_texts, vat_texts
 from corpus_near_dedup import THRESHOLDS, normalised
 from corpus_regions import leaks
@@ -25,7 +27,7 @@ from dagnam_contracts.hygiene.near_dedup import (
 from dagnam_contracts.hygiene.spans import findings
 
 NAMES = ("minhash.jsonl", "near_dedup.jsonl", "findings.jsonl")
-ALL_NAMES = (*NAMES, "credentials.jsonl")
+ALL_NAMES = (*NAMES, "credentials.jsonl", "classes.jsonl")
 Corpus = tuple[Path, dict[str, int]]
 
 # What a push-protection scanner keys on, and a little more; the exporter's own list is
@@ -143,6 +145,50 @@ def test_export_is_deterministic(corpus: Corpus, tmp_path: Path) -> None:
     for name in ALL_NAMES:
         assert (tmp_path / name).read_bytes() == (corpus[0] / name).read_bytes()
         (tmp_path / name).read_bytes().decode("utf-8")
+
+
+def _classes(corpus: Corpus) -> dict[str, list[list[int]]]:
+    cases = _read(corpus[0], "classes.jsonl")
+    assert len(cases) == corpus[1]["classes"] == 1
+    return cases[0]
+
+
+def _has(runs: list[list[int]], code: int) -> bool:
+    return any(lo <= code <= hi for lo, hi in runs)
+
+
+def test_the_classes_line_holds_the_three_classes_of_python_re(corpus: Corpus) -> None:
+    line = _classes(corpus)
+    assert set(line) == set(CLASSES)
+    assert _has(line["word"], 0xB2) and _has(line["word"], ord("_"))
+    assert _has(line["space"], 0x1C) and _has(line["space"], 0x85)
+    assert _has(line["digit"], 0x660) and _has(line["digit"], ord("7"))
+    assert not _has(line["word"], 0x345) and not _has(line["digit"], 0xB2)
+    assert not _has(line["space"], 0x200B) and not _has(line["space"], ord("a"))
+    assert corpus[1]["classes_space"] == len(line["space"])
+
+
+def test_the_class_ranges_are_sorted_disjoint_merged_and_without_surrogates(
+    corpus: Corpus,
+) -> None:
+    for runs in _classes(corpus).values():
+        assert runs and all(0 <= lo <= hi <= LAST for lo, hi in runs)
+        assert all(not (lo in SURROGATES or hi in SURROGATES) for lo, hi in runs)
+        assert all(left[1] + 1 < right[0] for left, right in pairwise(runs))
+
+
+def test_the_class_ranges_are_exactly_what_re_matches_on_every_code_point(
+    corpus: Corpus,
+) -> None:
+    for name, pattern in CLASSES.items():
+        member = re.compile(pattern).fullmatch
+        listed = {code for lo, hi in _classes(corpus)[name] for code in range(lo, hi + 1)}
+        matched = {
+            code
+            for code in range(LAST + 1)
+            if code not in SURROGATES and member(chr(code)) is not None
+        }
+        assert listed == matched
 
 
 def test_a_text_that_is_not_unicode_is_dropped_and_counted(corpus: Corpus) -> None:
