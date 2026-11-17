@@ -1,10 +1,20 @@
 """Which implementation the hygiene seams run on: the compiled core or this package's Python.
 
-The core is used when it is installed, its binding contract is the one this release was
-written against (`CORE_API`), it exports the three functions the seams call, and
-``DAGNAM_CONTRACTS_PURE`` is off. That variable is read once, when this module is first
-imported: unset, empty, ``0``, ``false``, ``no`` and ``off`` (any case) leave the core on;
-any other value switches it off, and the core is then not even imported.
+The core is a dependency of this package, so it is normally installed; it is used when
+every one of these holds, and the Python in this package runs otherwise, without a message:
+
+* ``DAGNAM_CONTRACTS_PURE`` is off. That variable is read once, when this module is first
+  imported: unset, empty, ``0``, ``false``, ``no`` and ``off`` (any case) leave the core on;
+  any other value switches it off, and the core is then not even imported.
+* ``import`` succeeds. On a platform or interpreter with no native wheel (free-threaded 3.13,
+  PyPy, Windows on arm64, ...) `dagnam-core` installs a stub whose ``hygiene`` raises
+  ``ImportError``. That is the only exception caught: any other is a defect to see.
+* ``CORE_API`` is the contract this release was written against, and ``UNICODE_SUPPORTED``
+  is true (the core has character tables for the interpreter's Unicode version; it follows
+  the interpreter's own, so the two read the same characters).
+* It exports the three functions the seams call and a ``NearDedupLimitError`` (a ``ValueError`` subclass, as this package's is), and its
+  five limits are this package's (`_limits`): a core that stops a batch somewhere else
+  would answer differently from the reference.
 """
 
 from __future__ import annotations
@@ -15,18 +25,28 @@ from contextvars import ContextVar
 import os
 from typing import Any, Literal
 
-CORE_API = 1
+from dagnam_contracts.hygiene import _limits
+
+CORE_API = 2
 """The binding contract this release was written against."""
 
 _FUNCTIONS = ("findings", "minhash_signature", "near_duplicates")
+_LIMITS = ("MAX_TEXTS", "MAX_TEXT_CHARS", "MAX_TOTAL_CHARS", "MAX_COMPARISONS", "MAX_PAIRS")
 _OFF = frozenset({"", "0", "false", "no", "off"})
+
+
+def _is_value_error_class(value: object) -> bool:
+    return isinstance(value, type) and issubclass(value, ValueError)
 
 
 def _usable(core: Any) -> bool:
     return (
         core is not None
         and getattr(core, "CORE_API", None) == CORE_API
+        and getattr(core, "UNICODE_SUPPORTED", None) is True
         and all(callable(getattr(core, name, None)) for name in _FUNCTIONS)
+        and _is_value_error_class(getattr(core, "NearDedupLimitError", None))
+        and all(getattr(core, name, None) == getattr(_limits, name) for name in _LIMITS)
     )
 
 

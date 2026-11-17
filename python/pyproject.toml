@@ -1,6 +1,6 @@
 [project]
 name = "dagnam-contracts"
-version = "0.6.0"
+version = "0.7.0"
 description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,19 +15,22 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-# INTENTIONALLY EMPTY, and a design constraint rather than an accident: the
-# `dagnam` SDK ships with only `requests` and `numpy`, so a contract package it
-# depends on must add nothing. This is exactly why the Pydantic registry stays
-# in `registry/` as an authoring format and is never packaged — the wheel
-# carries generated JSON and a plain-Python interpreter of it.
-dependencies = []
+# One dependency, by design: the compiled core (`dagnam-core`) runs the hygiene hot paths.
+# `dagnam` ships with `requests` and `numpy` only, so this is the one thing the contract
+# adds, and it is a wheel on every platform: where there is no native wheel (free-threaded
+# 3.13, PyPy, Windows on arm64, ...) the core's own stub wheel installs, reports the core
+# unavailable, and the Python in this package runs. No environment marker is needed, and
+# none is allowed (`tests/test_packaging.py`).
+# An exact pin, because the contract must match the core's behaviour exactly: a core release
+# can change a result without changing its binding contract, so every core release is a
+# release of this package. The Pydantic registry stays in `registry/` as an authoring format
+# and is never packaged.
+dependencies = ["dagnam-core==0.2.0"]
 
 [project.optional-dependencies]
-# The compiled backend for the hygiene functions (`dagnam-core`). Optional on purpose: the
-# Python in this package is the reference and runs wherever the compiled one has no wheel.
-# Exactly the core this release was tested against: a core release can change a result
-# without changing its binding contract, so each contracts release names its core.
-fast = ["dagnam-core==0.1.1"]
+# Kept as an alias of the default so `dagnam-contracts[fast]`, which 0.6.0 documented, keeps
+# installing. The same pin; nothing more.
+fast = ["dagnam-core==0.2.0"]
 
 [project.urls]
 Homepage = "https://github.com/Dagnam-AI/dag-contracts"
@@ -35,7 +38,7 @@ Source = "https://github.com/Dagnam-AI/dag-contracts"
 
 [dependency-groups]
 dev = [
-    "dagnam-core==0.1.1",
+    "dagnam-core==0.2.0",
     "hypothesis",
     "poethepoet>=0.46.0",
     "pyright",

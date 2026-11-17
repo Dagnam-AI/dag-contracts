@@ -112,8 +112,11 @@ wheels = [
 
 [[package]]
 name = "dagnam-contracts"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "." }
+dependencies = [
+    { name = "dagnam-core" },
+]
 
 [package.optional-dependencies]
 fast = [
@@ -132,12 +135,15 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "dagnam-core", marker = "extra == 'fast'", specifier = "==0.1.1" }]
+requires-dist = [
+    { name = "dagnam-core", specifier = "==0.2.0" },
+    { name = "dagnam-core", marker = "extra == 'fast'", specifier = "==0.2.0" },
+]
 provides-extras = ["fast"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "dagnam-core", specifier = "==0.1.1" },
+    { name = "dagnam-core", specifier = "==0.2.0" },
     { name = "hypothesis" },
     { name = "poethepoet", specifier = ">=0.46.0" },
     { name = "pyright" },
@@ -148,24 +154,25 @@ dev = [
 
 [[package]]
 name = "dagnam-core"
-version = "0.1.1"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7e/df/cfaafa9454f6eb18704df38f903beb8bc94a72ee87afc9bcde1eec93728f/dagnam_core-0.1.1.tar.gz", hash = "sha256:6757e898499a87ab6165e725ed6e5e2a6bccdd42145ebed69ad2f0a146cf2b37", size = 107448, upload-time = "2026-11-17T02:37:02.19Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/ec/68b07153c710be42eca03a1e081e2712e3702b5814561ced98de78a82c60/dagnam_core-0.2.0.tar.gz", hash = "sha256:44f8ed7a4de60d69832468769618610704fdf0ff90dffa06586c8d4e7b7a4981", size = 133891, upload-time = "2026-11-17T21:04:05.391Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/38/e1a6424cb7c96035070e184d2068521bce896105288d9c6fef7ffdd5daa2/dagnam_core-0.1.1-cp312-abi3-macosx_10_12_x86_64.whl", hash = "sha256:d7f71ab34471c58c8e7c87ded063c8c460eed2aa00def586cc5c9457e30b680d", size = 710525, upload-time = "2026-11-17T02:36:42.625Z" },
-    { url = "https://files.pythonhosted.org/packages/60/72/553a839745ef07f78eba713253a0ad38d81eb1b3a8e85f2bf509ae544d71/dagnam_core-0.1.1-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:76a9f389b7ca7306976318a50ee663428cf69d3276a78d0c4b67d0e2bd4f16e8", size = 650605, upload-time = "2026-11-17T02:36:44.245Z" },
-    { url = "https://files.pythonhosted.org/packages/2d/27/a959b26b0ae276c329a04ab0ae0402990603e8d8160b7173e0e1dc70e788/dagnam_core-0.1.1-cp312-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:63a9814f0cee8787255e3a4fdfb818dcee9431255d4eafe22eefb1d21a2f50a1", size = 694513, upload-time = "2026-11-17T02:36:45.656Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/45/c45e2c6c0cafba20941d343fef9e6316d26445600727a738ffbe5168b679/dagnam_core-0.1.1-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:6d106e6d6c1ac9b280dc59f5115a7fd156b00867c130b55f3f8ef6ea8104e482", size = 750277, upload-time = "2026-11-17T02:36:47.017Z" },
-    { url = "https://files.pythonhosted.org/packages/c8/45/ed0eee21dd7f230bce0a47b702bab4e4afd0782bf33f53ac862ad2b13401/dagnam_core-0.1.1-cp312-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:364ba756221f8678917a5b6af11c4dba2c387a85d61481b6fa9a259c30c8ebcf", size = 873339, upload-time = "2026-11-17T02:36:48.429Z" },
-    { url = "https://files.pythonhosted.org/packages/ee/14/b802dc737174543f70d1519e78efdfaad397aef0bc5ba6e920d5f13b0550/dagnam_core-0.1.1-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:47d0a8d70194ccb97953b81aa50e162d1b395437d05b15f9fc2aaa43f04ded11", size = 967024, upload-time = "2026-11-17T02:36:50.371Z" },
-    { url = "https://files.pythonhosted.org/packages/f3/5a/b7caccb1d9b5c66ca6d703a2eba957d8436d88efd0eed3889a5be3872ee9/dagnam_core-0.1.1-cp312-abi3-win_amd64.whl", hash = "sha256:1e95156dd1e7a9a98dbcc07dc0a229a83e9f390b346896b92afc495d5b351ce1", size = 674343, upload-time = "2026-11-17T02:36:51.702Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/d1/8ba1cfaa8c64718a7954040e95b1dd9a9a3774e033b837fe925eaf4d86f8/dagnam_core-0.1.1-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:081955403fe18974541f3e185e020d0351d97710d71f381915599f905f225292", size = 709280, upload-time = "2026-11-17T02:36:53.137Z" },
-    { url = "https://files.pythonhosted.org/packages/72/c3/95ac5642bb573591e9a07c236e0f2632cdfe90b24d63b3439c754ac0790d/dagnam_core-0.1.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:18fd6c7a7fe7ee9057a5374b579dca48a186a8f47908d3904a487598d8e8ff31", size = 649877, upload-time = "2026-11-17T02:36:54.507Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/ee/457d277491202776f122d1093be956072344a4e5ed320ef113f9b267908b/dagnam_core-0.1.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:eebd2ec8e4c4268d19a08c4ae2073cb5bab72540a0eb73074d66b71c2be42ced", size = 693723, upload-time = "2026-11-17T02:36:55.705Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/d6/c17a84d710bf2b0af754053116a01c9a580aa1fd787ff6c47b07183c7e7f/dagnam_core-0.1.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:f9bb2c88d839d36b79fc1c1eab096ab103bf9a06d061b157959e51a1e60905ab", size = 749289, upload-time = "2026-11-17T02:36:56.897Z" },
-    { url = "https://files.pythonhosted.org/packages/92/64/fd382eb9d5cfeabbffcfa584e28030d32dc57b3a753a1b3ef8efe175804a/dagnam_core-0.1.1-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:6ef9d8b1ca697784d510aa63d4875bdc1485f4a1b2daafd0c4e6cb2df1783207", size = 872513, upload-time = "2026-11-17T02:36:58.255Z" },
-    { url = "https://files.pythonhosted.org/packages/70/e1/cb4aea926ff8c6fc3ee76e337d2244b7a0dff42c5c693fccaf3914acdd59/dagnam_core-0.1.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:2811a93d27585eeb1e97776004cb4a367fb1d4794024661c398385a3f8a871ed", size = 965892, upload-time = "2026-11-17T02:36:59.594Z" },
-    { url = "https://files.pythonhosted.org/packages/b7/c0/f9ec8f6dc6870c82e1b881ee8f81786cfe6a1004ef2639f54e055aafe966/dagnam_core-0.1.1-cp314-cp314t-win_amd64.whl", hash = "sha256:7230386ce8b87f6c5914ee91340c9d4355eaa12321e507b5bcbd14ea0ceeb777", size = 672952, upload-time = "2026-11-17T02:37:00.851Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/85/1cca2f071e7a701077a4326e9b18ffab5b8e8941f9ac3b4b588022498693/dagnam_core-0.2.0-cp312-abi3-macosx_10_12_x86_64.whl", hash = "sha256:ea41c08112e374ef1c662f7d0b553bfedb570449bcb63cbcfa244bdd3819e9a8", size = 729174, upload-time = "2026-11-17T21:03:42.471Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/c7/74b6807b830278d7e58ff3d77933b9a924501303548d66bd6b4f2a9f88d9/dagnam_core-0.2.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:1a1153815ce66565a614417fb325913fbb2e5a5c02d94022914a14c0bcd3af81", size = 671864, upload-time = "2026-11-17T21:03:44.038Z" },
+    { url = "https://files.pythonhosted.org/packages/50/7a/a1ba015089aa8c7c067dd31226328b787406850a5bd9c18688f2a51439b9/dagnam_core-0.2.0-cp312-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aae3e6c51076fb1af7304c7db1a7f7a96b69b27719823327fe99f5578d132e6a", size = 715299, upload-time = "2026-11-17T21:03:45.325Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/5b/442301f1c47ad149cd22d4af02df991c12f065c31a191706af2c584c72b4/dagnam_core-0.2.0-cp312-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:017291c26d38382ffc505cabdaa216c7690a49b32e71530485630c3ed339fc0f", size = 770137, upload-time = "2026-11-17T21:03:46.876Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/72/f4a190e9b8e071d8c0741481019846468dcb7515409a2c75eee3a495f407/dagnam_core-0.2.0-cp312-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:dc9509be137cf62e23d82e9590f3143e7caa0cde5e36d91e5183c637e8fd2a2b", size = 893823, upload-time = "2026-11-17T21:03:48.384Z" },
+    { url = "https://files.pythonhosted.org/packages/24/1f/388c0714b92d6e269423b602fd6b8d97eaa84d483d759011b35362ad1aec/dagnam_core-0.2.0-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:22a274c784f233611a9dc6f0f530a5c6e1774608924d2466f0590a99033f9139", size = 986821, upload-time = "2026-11-17T21:03:49.939Z" },
+    { url = "https://files.pythonhosted.org/packages/34/70/ad2326eef8f10671851124b62af06b3cf334e246a910211cedd872a4fd12/dagnam_core-0.2.0-cp312-abi3-win_amd64.whl", hash = "sha256:a6950f2c1f868d02207164b571ef9f9ff3018477881f76cce67042150c0114f0", size = 694150, upload-time = "2026-11-17T21:03:51.185Z" },
+    { url = "https://files.pythonhosted.org/packages/df/d8/cc4cbd3fbc6c4763acbba226724c400b708de3b18204d1ab2aae39fa2201/dagnam_core-0.2.0-cp314-cp314t-macosx_10_12_x86_64.whl", hash = "sha256:44c9c64e7692b61cd6fb66d777dc9d9269346d866034954ff6512a9615eac687", size = 727155, upload-time = "2026-11-17T21:03:52.583Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/22/307f46e32411b0f306c12fdc59786be8538a386dc9aac54ab45591ea84df/dagnam_core-0.2.0-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:b2178177ffd45c2cfb9e04a1901b020be0f4be7c9bb10b54fbce19738ac02b27", size = 670661, upload-time = "2026-11-17T21:03:53.978Z" },
+    { url = "https://files.pythonhosted.org/packages/93/c7/fa71a5f494e55fae5f18ae05185c02b4f493d83a1717a6181790f93979eb/dagnam_core-0.2.0-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:823568a8ba99d43b3ccf0ef4cd32a8707e821a64c7a20374cbe4c190034ccca9", size = 714473, upload-time = "2026-11-17T21:03:55.232Z" },
+    { url = "https://files.pythonhosted.org/packages/57/96/6ca30605f9d086cf3adb0770fa13117e680d4bbea8b72788c758f7dd4072/dagnam_core-0.2.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0d59efc077ced6ba1e03930509ce188b17c19104c09d1a1e75aacb56bee6138e", size = 768920, upload-time = "2026-11-17T21:03:56.605Z" },
+    { url = "https://files.pythonhosted.org/packages/64/66/d58ff937b39edfb1c8af9a6a5c5156a04e95f6a6c4d955e03fc8b4cd32e4/dagnam_core-0.2.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:84c04807903547128bddf341ce5a27041f7fdaaf8bc9e2ea7be9311f79eb17ac", size = 893013, upload-time = "2026-11-17T21:03:58.165Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/21/7e282de18270e7d0a6119d64a8e633bf78e8ad36ee632caa6e4660b721ce/dagnam_core-0.2.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:2be7ad6ab22ee4ed0551d5a2c80451308d082acd323029e5bb4d08e2ff82e5d9", size = 985624, upload-time = "2026-11-17T21:03:59.724Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/e0/0151ff840c02d20e25f40b6448fb38de8c04eece0bfe56d7a01f92f3f198/dagnam_core-0.2.0-cp314-cp314t-win_amd64.whl", hash = "sha256:cdb8c0c544b74de173b47caada6d9a14dbeef02a5ff152a39d6072b331361596", size = 692434, upload-time = "2026-11-17T21:04:01.262Z" },
+    { url = "https://files.pythonhosted.org/packages/56/1f/222eefa68b7b566199b50ffddfd95b0bb0087345e72499121433e2b36bb6/dagnam_core-0.2.0-py3-none-any.whl", hash = "sha256:3b2d90e82180677ecad0bce4baf03cc7d596dca8eccc7a0f58c20a0eb1f9851f", size = 13820, upload-time = "2026-11-17T21:04:02.674Z" },
 ]
 
 [[package]]

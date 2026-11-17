@@ -50,12 +50,11 @@ Design, and why each piece is what it is:
   - `MAX_PAIRS`: the number of pairs found to be near-duplicates, which the result lists
     in full. The call raises instead of keeping the one past it.
 
-  `MAX_COMPARISONS` and `MAX_PAIRS` are enforced by the Python walk. A compiled core builds
-  its candidates and its pairs itself: `dagnam-core` 0.1.1 reads the `MAX_PAIRS` limit only
-  when it returns (a batch of identical rows has built every pair by then) and has no
-  comparison limit. A release of `dagnam-core` (0.2.0) is to enforce all five before it
-  allocates; until the `fast` extra pins it, the bounds below are the Python path's, and
-  the compiled backend has only the three that the wrapper reads before calling it.
+  The compiled core (`dagnam-core`) enforces all five itself, before it allocates what the
+  limit bounds, and it is used only when its five constants are these (see `_backend`); the
+  wrapper reads the first three on the rows as sent, so a row of a hundred megabytes is
+  refused having cost nothing, and gives the caller this module's `NearDedupLimitError`,
+  with the core's message (the same words), when the core raises its own.
 * **What it holds, measured** (CPython 3.14, Python path, on a laptop with other jobs
   running; one process, peak resident set including the interpreter's own 35 MB):
   one text of `MAX_TEXT_CHARS` characters of one-character words, the most shingles a
@@ -68,7 +67,8 @@ Design, and why each piece is what it is:
   comparison and a pair limit can all be reached by one batch: the longest is
   `MAX_TOTAL_CHARS` of text and `MAX_COMPARISONS` comparisons, about five minutes, and the
   most memory about 2 GiB. The result is a list of pairs, not a count, so a caller that
-  needs a bounded answer for a bigger batch must cluster the identical texts first.
+  needs a bounded answer for a bigger batch must cluster the identical texts first. The
+  compiled path peaks no higher than the Python one (see the changelog for the numbers).
 
 Pure — no session, no I/O.
 """
@@ -82,6 +82,13 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from dagnam_contracts.hygiene import _backend
+from dagnam_contracts.hygiene._limits import (
+    MAX_COMPARISONS,
+    MAX_PAIRS,
+    MAX_TEXT_CHARS,
+    MAX_TEXTS,
+    MAX_TOTAL_CHARS,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
@@ -112,39 +119,6 @@ DEFAULT_THRESHOLD = 0.9
 """Conservative by intent. Near-dedup deletes training signal when it is wrong,
 so the default only merges rows that are almost the same text; a caller that
 knows its task tolerates more passes a lower number explicitly."""
-
-MAX_TEXTS = 50_000
-"""The most rows `compute_near_duplicates` takes: more raises `NearDedupLimitError`."""
-
-MAX_TEXT_CHARS = 1_000_000
-"""The most characters in one row's string values (joined by a space), as sent and as
-compared."""
-
-MAX_TOTAL_CHARS = 20_000_000
-"""The most characters in the string values of all the rows together, as sent and as
-compared."""
-
-MAX_COMPARISONS = 40_000_000
-"""The most candidate pairs the Python walk compares (see the module docstring).
-
-A candidate pair is two rows that share an LSH band, counted once however many bands they
-share, whether or not it turns out to be a near-duplicate. The call raises
-`NearDedupLimitError` instead of making the comparison after the last one this allows.
-
-The count at which two implementations stop is the same because the candidates are walked
-in one deterministic order, the one `_candidate_pairs` defines: ascending ``left`` row,
-and for each ``left`` its ``right`` rows ascending, each pair once. A port counts the
-pairs it yields in that order.
-"""
-
-MAX_PAIRS = 20_000_000
-"""The most near-duplicate pairs `compute_near_duplicates` returns.
-
-The result lists every pair of rows judged near-duplicates, so a batch of n identical rows
-has n * (n - 1) / 2 of them (about 6,300 identical rows reach this); past this many the call
-raises `NearDedupLimitError`. Rows whose string values are all empty or all punctuation, and
-rows with no string values at all, compare as the same empty text.
-"""
 
 
 class NearDedupLimitError(ValueError):
@@ -368,12 +342,21 @@ def compute_near_duplicates(
     # `row_text` turns every character that is not a word character or whitespace, a lone
     # surrogate included, into a space, so the core always receives UTF-8 here.
     if core is not None:
-        duplicates, found = core.near_duplicates(texts, threshold)
-        _check_pairs(len(found))
+        try:
+            duplicates, found = core.near_duplicates(texts, threshold)
+        except core.NearDedupLimitError as error:
+            raise NearDedupLimitError(str(error)) from None  # one public type, the same message
+        # Each tuple the core made is replaced by its pair in the list the core returned,
+        # so a tuple is freed as its pair is built: the two never exist together, and the
+        # result peaks no higher than the core's own list did (a second list of pairs beside
+        # it added 300 MB at 3,000 identical rows and 1.4 GB at `MAX_PAIRS`). The core shares
+        # one int per row and one float per distinct similarity; the pairs keep them.
+        for index, (kept, duplicate, similarity) in enumerate(found):
+            found[index] = NearDuplicatePair(kept, duplicate, similarity)
         return NearDedupResult(
             threshold=threshold,
             duplicate_indices=list(duplicates),
-            pairs=[NearDuplicatePair(kept, dup, sim) for kept, dup, sim in found],
+            pairs=found,
             kept_count=len(rows) - len(duplicates),
             duplicate_count=len(duplicates),
         )
