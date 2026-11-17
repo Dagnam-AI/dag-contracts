@@ -10,12 +10,15 @@ point is a fixed point, and what it costs.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterator
 from itertools import pairwise, product
 import random
+from unittest import mock
 
 from pii_corpus import SAMPLES, SHAPE_NAMES, SHAPES, TEXTS, everything_problems, found
 import pytest
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.detectors import PII_CODES, PII_DETECTORS, REDACTION_TEMPLATE
 from dagnam_contracts.hygiene.spans import (
     PLACEHOLDER,
@@ -31,6 +34,16 @@ from dagnam_contracts.hygiene.spans import (
     rounds_needed,
     segments,
 )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _python_reference() -> Iterator[None]:
+    """These tests pin the Python reference, so it runs even when the compiled core is
+    installed (`test_differential.py` ties the two together). Module-scoped, and holding no
+    other fixture, so Hypothesis's function-scoped-fixture check has nothing to refuse."""
+    with mock.patch.object(_backend, "active", lambda: None):
+        yield
+
 
 _BY_CODE = {detector.code: detector for detector in PII_DETECTORS}
 _EMAIL, _PHONE, _SECRET = _BY_CODE["PII_EMAIL"], _BY_CODE["PII_PHONE"], _BY_CODE["PII_SECRET"]

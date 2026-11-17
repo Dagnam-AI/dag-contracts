@@ -36,6 +36,7 @@ from collections import Counter
 from collections.abc import Iterable
 import re
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.detectors import PII_DETECTORS, REDACTION_TEMPLATE, PiiDetector
 
 Span = tuple[int, int, PiiDetector]
@@ -61,6 +62,7 @@ WINDOW = 48
 MARGIN = 3
 
 _EVERY_CODE = frozenset(detector.code for detector in PII_DETECTORS)
+_BY_CODE = {detector.code: detector for detector in PII_DETECTORS}
 
 # What a piece of text must hold before any detector can find anything in it: a letter or a
 # digit, or an at sign. The address pattern needs no letter or digit (`_@_._` is one), and
@@ -164,8 +166,18 @@ def findings(text: str, stats: Counter[str] | None = None) -> list[Span]:
     through `WINDOW` (the chain case), and the pieces neither reading settled go back on
     the worklist. Every step accepts a span or retires a piece, so the worklist empties.
     ``stats`` counts the ``full reads``, the ``windows`` and the ``characters read`` by
-    both, for a caller that measures the cost.
+    both, for a caller that measures the cost. A caller that passes ``stats`` is measuring
+    this algorithm, so it always runs here; otherwise the compiled core reads the text when
+    one is installed (see `dagnam_contracts.hygiene.backend`).
     """
+    core = _backend.active() if stats is None else None
+    if core is not None:
+        try:
+            raw = core.findings(text)
+        except UnicodeEncodeError:
+            pass  # not UTF-8 (a lone surrogate): the Python below reads it
+        else:
+            return [(start, end, _BY_CODE[code]) for start, end, code in raw]
     counts: Counter[str] = Counter() if stats is None else stats
     out: list[Span] = []
     work = segments(text)

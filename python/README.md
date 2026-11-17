@@ -102,6 +102,37 @@ about a later scan of the row.
 UK NINOs, Canadian SINs, Indian Aadhaar and PAN numbers and EU VAT numbers,
 each checksum-, parser-, format- or keyword-backed and under its own code.
 
+## A compiled backend, opt-in
+
+```sh
+pip install "dagnam-contracts[fast]"
+```
+
+The `fast` extra installs [`dagnam-core`](https://pypi.org/project/dagnam-core/), a
+compiled implementation of the hygiene hot paths: the PII scan (`scan_rows`,
+`redact_rows`, `apply_pii_policy`) and near-duplicate detection
+(`compute_near_duplicates`, `minhash_signature`). It returns exactly what the Python
+returns, which stays the reference: a differential test runs both over the same inputs.
+
+```python
+from dagnam_contracts.hygiene import backend
+
+backend()  # "rust" when the compiled core is installed and in use, otherwise "python"
+```
+
+The core is used when it is installed and its binding contract matches the one this
+release was written against; otherwise the Python runs, silently. Set
+`DAGNAM_CONTRACTS_PURE=1` to force the Python everywhere (to compare the two, or to rule
+the core out while debugging). Wheels exist for Linux x86_64 and aarch64 (glibc and
+musl), macOS x86_64 and arm64, and Windows x86_64, on CPython 3.12 and later including
+the free-threaded 3.14t; anywhere else the package installs without the core and runs
+the Python. `dependencies` stays empty: the extra is the only way the core arrives.
+
+Known limit: near-duplicate detection compares every pair of rows whose normalised text
+is identical, so its memory grows with the square of the number of identical texts. A
+dataset in which a very large share of the rows is one repeated text should go through
+`compute_exact_duplicates` first.
+
 ## Versioning
 
 `dagnam-contracts` and `@dagnam/contracts` (npm) are published together at the

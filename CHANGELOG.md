@@ -8,6 +8,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
+## [0.6.0] - 2026-11-17
+
+### Added
+
+- **`dagnam-contracts[fast]`: an optional compiled backend for the dataset-hygiene
+  functions.** The extra installs `dagnam-core`, which runs the PII scan
+  (`scan_rows`, `redact_rows`, `apply_pii_policy`), `minhash_signature` and
+  `compute_near_duplicates` in compiled code. The results are the Python's, and the
+  Python stays the reference (a differential test runs both over the same inputs).
+  Without the extra nothing changes: `dependencies` is still empty.
+- **`dagnam_contracts.hygiene.backend()`** (also `dagnam_contracts.backend`) returns
+  `"rust"` when the compiled core is in use and `"python"` otherwise.
+- **`DAGNAM_CONTRACTS_PURE`**: set to any non-empty value, it forces the Python
+  everywhere even when the core is installed.
+- Supported platforms for the core: Linux x86_64 and aarch64 (glibc and musl), macOS
+  x86_64 and arm64, Windows x86_64, and CPython 3.12 and later including the
+  free-threaded 3.14t. Elsewhere the extra installs no core and the Python runs.
+- The gate runs the whole suite twice, on the compiled backend and on the pure Python,
+  each at 100% statement and branch coverage.
+
+### Known limits
+
+- Near-duplicate detection compares every pair of rows with identical normalised text,
+  so its memory grows with the square of the number of identical texts. This holds on
+  both backends.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added

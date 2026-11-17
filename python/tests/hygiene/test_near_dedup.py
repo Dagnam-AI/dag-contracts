@@ -8,11 +8,14 @@ threshold that does not depend on set/dict iteration order.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import random
+from unittest import mock
 
 from hypothesis import given, settings as hyp_settings, strategies as st
 import pytest
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.near_dedup import (
     _MASK64,
     DEFAULT_THRESHOLD,
@@ -23,6 +26,16 @@ from dagnam_contracts.hygiene.near_dedup import (
     row_text,
     shingles,
 )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _python_reference() -> Iterator[None]:
+    """These tests pin the Python reference, so it runs even when the compiled core is
+    installed (`test_differential.py` ties the two together). Module-scoped, and holding no
+    other fixture, so Hypothesis's function-scoped-fixture check has nothing to refuse."""
+    with mock.patch.object(_backend, "active", lambda: None):
+        yield
+
 
 _WORDS = ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota"]
 

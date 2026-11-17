@@ -63,6 +63,7 @@ EXPECTED_EXPORTS = [
     "Winner",
     "Z95",
     "apply_pii_policy",
+    "backend",
     "canonical_row_hash",
     "compute_exact_duplicates",
     "compute_near_duplicates",
