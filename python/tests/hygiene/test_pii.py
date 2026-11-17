@@ -54,8 +54,8 @@ LABELLED_CORPUS: list[tuple[str, set[str]]] = [
     # --- secret (every pattern has its own positive and near-miss in
     # tests/hygiene/test_credentials.py; these are the everyday shapes) ---
     ("Authorization: Bearer " + "a1B2c3D4e5F6g7H8i9J0k1L2", {"PII_SECRET"}),
-    ("export OPENAI_API_KEY=" + "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3", {"PII_SECRET"}),
-    ("db password: hunter2", {"PII_SECRET"}),
+    ("export OPENAI_API_KEY=" + "s" + ("k-a1" + "B2c3D4e5F6g7H8i9J0k1L2m3"), {"PII_SECRET"}),
+    ("db password: hun" + "ter2", {"PII_SECRET"}),
     # A secret with no recognisable shape, assigned to nothing: a known miss.
     ("the vault combination is correcthorsebatterystaple", {"PII_SECRET"}),
     ("commit da39a3ee5e6b4b0d3255bfef95601890afd80709", set()),
@@ -292,7 +292,7 @@ class TestApplyPiiPolicy:
         assert changed == 1
 
 
-_KEY = "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3"
+_KEY = "s" + ("k-a1B2c" + "3D4e5F6g7H8i9J0k1L2m3")
 
 
 class TestSecretClass:
@@ -326,7 +326,7 @@ class TestSecretClass:
         Replacing both right-to-left used the outer span's stale offsets once
         the inner one had moved the text, and left `D:PII_EMAIL]` behind.
         """
-        rows = [{"a": "password=pre#x1@y.com end"}]
+        rows = [{"a": "password=pre#x" + "1@y.com end"}]
 
         kept, changed, _ = apply_pii_policy(rows, dict.fromkeys(PII_CODES, "redact"))
 

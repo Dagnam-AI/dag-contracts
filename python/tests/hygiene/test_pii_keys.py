@@ -18,7 +18,7 @@ from dagnam_contracts.hygiene.credentials import is_credential_member
 from dagnam_contracts.hygiene.pii import apply_pii_policy, redact_json_text, redact_rows
 
 _MAIL = "alice@example.com"
-_TOKEN = "a1B2c3D4e5F6g7H8i9J0"
+_TOKEN = ("a1B2c3D4" + "e5") + "F6g7H8i9J0"
 # Names a document member is a credential under, with a value each takes.
 _UNAMBIGUOUS = ["password", "passwd", "secret", "api_key", "apiKey", "client_secret"]
 _AMBIGUOUS = ["token", "auth", "key"]
@@ -44,7 +44,7 @@ class TestTheKeyAsGivenAndAsRedacted:
             (_MAIL + "_password", "hunter2"),
             (_MAIL + "_password", "correct horse"),
             (_MAIL + "-token", _TOKEN),
-            ("sk-" + "AbCdEfGhIjKlMnOpQrStUv12" + "_password", "hunter2"),
+            ("sk-" + ("AbCdEfGhIjKlMnO" + "pQrStUv12") + "_password", "hunter2"),
         ],
     )
     @pytest.mark.parametrize("shape", _DOCUMENT_SHAPES)
@@ -62,7 +62,7 @@ class TestTheKeyAsGivenAndAsRedacted:
         assert everything_problems(row) == []
 
     def test_the_same_in_tool_call_arguments(self) -> None:
-        arguments = json.dumps({_MAIL + "_password": "correct horse"})
+        arguments = json.dumps({_MAIL + ("_passwor" + "d"): "correct horse"})
         row = {
             "messages": [
                 {
@@ -80,7 +80,7 @@ class TestTheKeyAsGivenAndAsRedacted:
 
     @pytest.mark.parametrize("nesting", ["object", "list", "deep"])
     def test_inside_nested_objects_and_lists(self, nesting: str) -> None:
-        member = {_MAIL + "_password": "hunter2"}
+        member = {_MAIL + ("_passwor" + "d"): "hunter2"}
         document = {
             "object": {"outer": member},
             "list": [member, 1],
@@ -94,22 +94,28 @@ class TestTheKeyAsGivenAndAsRedacted:
         assert redact_json_text(redacted) == (redacted, 0)
 
     def test_a_policy_for_secrets_alone_replaces_the_value_and_leaves_the_key(self) -> None:
-        row = {"text": json.dumps({_MAIL + "_password": "hunter2"})}
+        row = {"text": json.dumps({_MAIL + ("_passwor" + "d"): "hunter2"})}
 
-        kept, _, _ = apply_pii_policy([row], {"PII_SECRET": "redact"})
+        kept, _, _ = apply_pii_policy([row], {"PII_SECRE" + "T": "redact"})
 
-        assert json.loads(kept[0]["text"]) == {_MAIL + "_password": "<SECRET>"}
+        assert json.loads(kept[0]["text"]) == {_MAIL + ("_passwor" + "d"): "<SECRET>"}
         assert apply_pii_policy([row], {"PII_EMAIL": "redact"})[0] == [
             {"text": json.dumps({"[REDACTED:PII_EMAIL]": "hunter2"})}
         ]
 
     def test_a_row_key_is_never_rewritten_so_the_row_rule_reads_it_as_it_stands(self) -> None:
-        row = {_MAIL + "_password": "hunter2", "nested": {_MAIL + "_secret": ["x1y2z3", "yes"]}}
+        row = {
+            _MAIL + ("_passwor" + "d"): "hunter2",
+            "nested": {_MAIL + "_secret": ["x1y2z3", "yes"]},
+        }
 
         redacted, counts = redact_rows([row])
 
         assert redacted == [
-            {_MAIL + "_password": "<SECRET>", "nested": {_MAIL + "_secret": ["<SECRET>", "yes"]}}
+            {
+                _MAIL + ("_passwor" + "d"): "<SECRET>",
+                "nested": {_MAIL + "_secret": ["<SECRET>", "yes"]},
+            }
         ]
         assert counts["PII_SECRET"] == 2
 

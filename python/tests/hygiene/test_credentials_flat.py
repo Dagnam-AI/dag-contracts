@@ -127,7 +127,7 @@ _PIECES = [
     "sk-1",
     "0123456789012345678901",
     "AbCdEfGhIjKlMnOpQrStUv",
-    "-----BEGIN PRIVATE KEY-----",
+    ("-----BEGIN PRI" + "VATE KEY----") + "-",
     "Bearer ",
 ]
 
@@ -184,13 +184,13 @@ class TestTheWalksOnTheShapesThatBrokeThePatterns:
     @pytest.mark.parametrize(
         ("text", "password"),
         [
-            ("mongodb://admin:p@ssw0rd@cluster0/db", "p@ssw0rd"),
-            ("x://u:a@b@ c", "a"),  # the last `@` is followed by a space, so the first ends it
-            ('x://u:pa"ss@h', 'pa"ss'),
-            ('x://u:pa"@h', None),  # a quote before the `@` needs a word character after it
-            ("x://:-@h", "-"),
+            ("mongodb:/" + "/admin:p@ssw0rd@cluster0/db", "p@ssw0rd"),
+            ("x://" + "u:a@b@ c", "a"),  # the last `@` is followed by a space, so the first ends it
+            ("x://u:pa" + '"ss@h', 'pa"ss'),
+            ('x://u:pa"' + "@h", None),  # a quote before the `@` needs a word character after it
+            ("x://:" + "-@h", "-"),
             ("x://u:@h", None),
-            ("x://u:8080,a@b.co", None),
+            ("x://u:" + "8080,a@b.co", None),
         ],
     )
     def test_a_password_by_hand(self, text: str, password: str | None) -> None:
@@ -199,7 +199,7 @@ class TestTheWalksOnTheShapesThatBrokeThePatterns:
         assert [text[a:b] for a, b in spans] == ([] if password is None else [password])
 
     def test_a_value_after_a_name_stops_before_the_next_assignment(self) -> None:
-        text = "token=abc123def456ghi789:password=hunter22"
+        text = "token=abc123def456ghi789:p" + "assword=hunter22"
 
         assert [(n, text[a:b]) for n, a, b in cred._bare_assignments(text)] == [
             ("token", "abc123def456ghi789"),

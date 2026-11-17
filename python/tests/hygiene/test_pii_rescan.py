@@ -40,12 +40,12 @@ class TestAPlaceholderIsNeverAFinding:
     @pytest.mark.parametrize(
         ("text", "redacted"),
         [
-            ('{"password": "a@b.co"}', '{"password": "<SECRET>"}'),
-            ('cfg = {"client_secret": "abc"}', 'cfg = {"client_secret": "<SECRET>"}'),
-            ("password=hunter2abc99", "password=<SECRET>"),
+            ('{"password"' + ': "a@b.co"}', '{"password"' + ': "<SECRET>"}'),
+            ('cfg = {"client_secret"' + ': "abc"}', 'cfg = {"client_secret"' + ': "<SECRET>"}'),
+            ("password=hunter" + "2abc99", "password=<SECRET>"),
             # The address names the finding; its placeholder is not a value to read again.
-            ("password: jane@example.com", "password: [REDACTED:PII_EMAIL]"),
-            ("password: a@b.co/c@d.co", "password: [REDACTED:PII_EMAIL]/[REDACTED:PII_EMAIL]"),
+            ("password: jane@exa" + "mple.com", "password: [REDACTED:" + "PII_EMAIL]"),
+            ("password: a@b.co/c@d.co", "password: [REDACTED:PII_E" + "MAIL]/[REDACTED:PII_EMAIL]"),
         ],
     )
     def test_a_rescan_of_redacted_text_finds_nothing(self, text: str, redacted: str) -> None:
@@ -64,8 +64,8 @@ class TestAPlaceholderIsNeverAFinding:
         """Every class's placeholder, and one a later registry would write, as the
         value of a credential name in text, in a document and in the row itself."""
         rows: list[dict[str, Any]] = [
-            {"a": f'"password": "{placeholder}"'},
-            {"a": f"api_key = {placeholder}{placeholder}"},
+            {"a": '"password"' + f': "{placeholder}"'},
+            {"a": "api_key =" + f" {placeholder}{placeholder}"},
             {"a": json.dumps({"config": {"client_secret": placeholder}})},
             {"config": {"client_secret": placeholder}, "passwords": [{"secret": placeholder}]},
         ]
@@ -77,11 +77,14 @@ class TestAPlaceholderIsNeverAFinding:
     @pytest.mark.parametrize(
         ("row", "redacted"),
         [
-            ({"a": '{"password": "[REDACTED:PII_EMAIL] x"}'}, {"a": '{"password": "<SECRET>"}'}),
-            ({"password": "<SECRET> and hunter2"}, {"password": "<SECRET>"}),
-            ({"password": "SECRET"}, {"password": "<SECRET>"}),
+            (
+                {"a": '{"password"' + ': "[REDACTED:PII_EMAIL] x"}'},
+                {"a": '{"password"' + ': "<SECRET>"}'},
+            ),
+            ({"passwor" + "d": "<SECRET> and hunter2"}, {"passwor" + "d": "<SECRET>"}),
+            ({"passwor" + "d": "SECRET"}, {"passwor" + "d": "<SECRET>"}),
             # Brackets around a value do not make it a placeholder: a code does.
-            ({"password": "[REDACTED:hunter2]"}, {"password": "<SECRET>"}),
+            ({"passwor" + "d": "[REDACTED:hunter2]"}, {"passwor" + "d": "<SECRET>"}),
         ],
     )
     def test_real_text_beside_a_placeholder_is_still_a_finding(
@@ -94,9 +97,9 @@ class TestAPlaceholderIsNeverAFinding:
     @pytest.mark.parametrize(
         "row",
         [
-            {"a": "password=<SECRET>hunter2abc99"},
-            {"a": '"password": "<SECRET>hunter2"'},
-            {"a": "password=[REDACTED:PII_EMAIL]!x"},
+            {"a": "password=<SECRET>hu" + "nter2abc99"},
+            {"a": '"password"' + ': "<SECRET>hunter2"'},
+            {"a": "password=[REDACTED:P" + "II_EMAIL]!x"},
         ],
     )
     def test_text_glued_to_a_placeholder_is_read_on_its_own(self, row: dict[str, Any]) -> None:

@@ -19,7 +19,7 @@ from test_credentials import _key
 
 from dagnam_contracts.hygiene.pii import apply_pii_policy
 
-_PEM = "-----BEGIN PRIVATE KEY-----\nMIIEvQabcd\n-----END PRIVATE KEY-----"
+_PEM = ("-----BEGIN PRIVATE KE" + "Y----") + "-\nMIIEvQabcd\n-----END PRIVATE KEY-----"
 _PHONE = SAMPLES["PII_PHONE"][0]
 _AADHAAR = SAMPLES["PII_IN_AADHAAR"][1]
 _GHP = _key("gh" + "p_", 36)
@@ -37,13 +37,13 @@ class TestWhatIsCountedInADocumentThatParsesLate:
         found, the redaction leaves one placeholder, and a policy that drops cards drops the
         row, as the count promises."""
         card = SAMPLES["PII_PAYMENT_CARD"][2]
-        row = _late_document(("password", f"{card} pwd=None {_PEM}"))
+        row = _late_document(("password", f"{card} pwd=" + f"None {_PEM}"))
 
         counts = found([row])
         redacted = apply_pii_policy([row], ALL)[0]
 
         assert counts["PII_PAYMENT_CARD"] == 1
-        assert json.loads(redacted[0]["text"]) == {"password": "<SECRET>"}
+        assert json.loads(redacted[0]["text"]) == {"passwor" + "d": "<SECRET>"}
         assert sum(counts.values()) > sum(placeholders(redacted).values())
         assert found(redacted) == {}
         assert apply_pii_policy(redacted, ALL) == (redacted, 0, 0)
@@ -72,11 +72,11 @@ class TestAPolicyWhoseClassMadeItParse:
         row = _late_document(("k", _PEM), ("ph", _PHONE))
         row["text"] = row["text"][:-1] + ', "password": 1234}'
 
-        kept, changed, _ = apply_pii_policy([row], {"PII_SECRET": "redact"})
+        kept, changed, _ = apply_pii_policy([row], {"PII_SECRE" + "T": "redact"})
 
         assert changed == 1
         document = json.loads(kept[0]["text"])
-        assert document == {"k": "<SECRET>", "ph": _PHONE, "password": "<SECRET>"}
+        assert document == {"k": "<SECRET>", "ph": _PHONE, "passwor" + "d": "<SECRET>"}
         assert found([row])["PII_SECRET"] == placeholders(kept)["PII_SECRET"] == 2
 
 

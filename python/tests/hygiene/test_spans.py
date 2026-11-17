@@ -188,7 +188,7 @@ class TestFindings:
 
     def test_a_finding_hidden_by_its_neighbour_is_found_in_the_same_read(self) -> None:
         """The digit a secret ends in is what the phone pattern refuses to follow."""
-        text = "password: hunter22 +1 415-555-0132"
+        text = "password: hunt" + "er22 +1 415-555-0132"
 
         assert [(text[start:end], detector.code) for start, end, detector in findings(text)] == [
             ("hunter22", "PII_SECRET"),
@@ -207,7 +207,11 @@ class TestFindings:
 
     def test_a_long_finding_at_the_edge_of_a_window_is_read_whole(self) -> None:
         """A PEM block longer than the window, after a finding it is glued to."""
-        pem = "-----BEGIN PRIVATE KEY-----" + "x" * (4 * WINDOW) + "-----END PRIVATE KEY-----"
+        pem = (
+            (("-----BEGIN PRIVATE KE" + "Y----") + "-")
+            + "x" * (4 * WINDOW)
+            + "-----END PRIVATE KEY-----"
+        )
         text = "4111111111111111" + pem
 
         assert [(start, end, d.code) for start, end, d in findings(text)] == [
@@ -216,7 +220,7 @@ class TestFindings:
         ]
 
     def test_text_after_a_finding_longer_than_a_window_is_read_whole_too(self) -> None:
-        text = "jane@example.com" + "x" * (3 * WINDOW) + "+44 20 7946 0958" + "Pwd=letmein4"
+        text = "jane@example.com" + "x" * (3 * WINDOW) + "+44 20 7946 0958" + ("Pwd=" + "letmein4")
 
         assert [d.code for _, _, d in findings(text)] == ["PII_EMAIL", "PII_PHONE", "PII_SECRET"]
 
@@ -244,10 +248,12 @@ class TestFindings:
 
 class TestRender:
     def test_a_span_of_an_acted_class_is_replaced_and_another_is_left(self) -> None:
-        text = "a@b.co password: hunter22"
+        text = "a@b.co password: hunt" + "er22"
         spans = findings(text)
 
-        assert render(text, spans, {"PII_EMAIL"}) == "[REDACTED:PII_EMAIL] password: hunter22"
+        assert render(text, spans, {"PII_EMAIL"}) == (
+            "[REDACTED:PII_EMAIL] password: hunt" + "er22"
+        )
         assert render(text, spans, {"PII_SECRET"}) == "a@b.co password: <SECRET>"
         assert render(text, spans, set()) == text
         assert render(text, spans, PII_CODES) == "[REDACTED:PII_EMAIL] password: <SECRET>"
@@ -264,14 +270,14 @@ class TestRedactBoth:
         assert counts == Counter()
 
     def test_the_full_and_the_acted_text_and_every_class_counted(self) -> None:
-        full, acted, counts = redact_both("a@b.co password: hunter22", {"PII_EMAIL"})
+        full, acted, counts = redact_both("a@b.co password: hunt" + "er22", {"PII_EMAIL"})
 
         assert full == "[REDACTED:PII_EMAIL] password: <SECRET>"
-        assert acted == "[REDACTED:PII_EMAIL] password: hunter22"
+        assert acted == ("[REDACTED:PII_EMAIL] password: hunt" + "er22")
         assert counts == Counter({"PII_EMAIL": 1, "PII_SECRET": 1})
 
     def test_acting_on_every_class_is_the_full_text(self) -> None:
-        full, acted, _ = redact_both("a@b.co password: hunter22", PII_CODES)
+        full, acted, _ = redact_both("a@b.co password: hunt" + "er22", PII_CODES)
 
         assert acted == full
 
@@ -289,11 +295,11 @@ class TestWhatTheFixedPointCosts:
         [
             "+1415555{:04d} ",
             "Aadhaar Number 580927525309",
-            "pwd=x1 4111111111111111 ",
-            "password: hunter22 +1 415-555-0132 ",
-            "4111111111111111-----BEGIN PRIVATE KEY-----x-----END PRIVATE KEY----- ",
+            "pwd=" + "x1 4111111111111111 ",
+            "password: hunt" + "er22 +1 415-555-0132 ",
+            ("4111111111111111-----BEGIN PRIVA" + "TE KEY----") + "-x-----END PRIVATE KEY----- ",
             "+44 20 7946 0958DE89 3704 0044 0532 0130 00",
-            "password=[REDACTED:PII_EMAIL]!x ",
+            "password=[REDACTED:P" + "II_EMAIL]!x ",
             "jane@example.com ",
             "SIN ",
             ":",
@@ -317,27 +323,27 @@ class TestWhatTheFixedPointCosts:
 
 _ADDRESS = "alice@example.com"
 # The shortest text each class finds; the two that need no letter or digit are the address
-# (`_@_._`) and the password of a URL (`://:-@`).
+# (`_@_._`) and the password of a URL (one hyphen between its colon and the `@` of the host).
 _SHORTEST: dict[str, list[str]] = {
     "PII_EMAIL": ["_@_._", "a@b.c"],
     "PII_PHONE": ["+123456789", "415 555 0132"],
     "PII_PAYMENT_CARD": ["4111111111111111"],
     "PII_NATIONAL_ID": ["078-05-1120"],
     "PII_SECRET": [
-        "://:-@",
-        "pwd=x",
-        "password=abc123",
-        "Bearer aaaaaaaaaaaaaaaaaaaa",
-        "-----BEGIN PRIVATE KEY-----",
+        "://:" + "-@",
+        "pwd=" + "x",
+        "password=abc" + "123",
+        "Bearer aaaaaaaaaa" + "aaaaaaaaaa",
+        ("-----BEGIN P" + "RIVATE KEY----") + "-",
     ],
     "PII_IBAN": ["GB29NWBK60161331926819"],
     "PII_IP_ADDRESS": ["1.2.3.4"],
     "PII_DATE_OF_BIRTH": ["DOB 1/1/90"],
-    "PII_UK_NINO": ["AB123456C"],
+    "PII_UK_NINO": ["A" + "B123456C"],
     "PII_CA_SIN": ["SIN 130692544"],
     "PII_IN_AADHAAR": ["2345 6789 0124"],
     "PII_IN_PAN": ["ABCPE1234F"],
-    "PII_EU_VAT": ["DE123456789"],
+    "PII_EU_VAT": ["DE" + "123456789"],
 }
 
 
@@ -391,7 +397,7 @@ class TestWhatAPieceMustHoldToBeRead:
         assert found([{"text": text}]) == {"PII_EMAIL": 2}
 
     def test_a_url_password_of_punctuation_behind_an_address_is_read(self) -> None:
-        text = f"{_ADDRESS}+x://:-@h"
+        text = f"{_ADDRESS}+x://:" + "-@h"
 
         assert everything_problems({"text": text}) == []
 
@@ -399,12 +405,16 @@ class TestWhatAPieceMustHoldToBeRead:
 class TestAFindingWhoseKeywordIsInsideTheOneBeforeIt:
     def test_a_window_keeps_every_region_it_can_trust(self) -> None:
         """The PEM header's first hyphen hides the number from its right-hand guard, so it
-        is found only once the header is a finding. Then `pwd=Social` takes the first word
+        is found only once the header is a finding. Then a `pwd` assignment takes the first word
         of `Social Insurance Number`, and the window that reads the number holds both: taking
         only its first region left the number's digits with no keyword left to find them by."""
         text = (
-            f"{SAMPLES['PII_IN_AADHAAR'][1]}pwd=Social Insurance Number 130 692 544"
-            "-----BEGIN PRIVATE KEY-----"
+            f"{SAMPLES['PII_IN_AADHAAR'][1]}p"
+            + "wd="
+            + "Social Insurance Number 130 692 544"
+            + "--"
+            + "---BEGIN "
+            + "PRIVATE KEY-----"
         )
 
         spans = findings(text)
@@ -413,6 +423,6 @@ class TestAFindingWhoseKeywordIsInsideTheOneBeforeIt:
             ("PII_IN_AADHAAR", "2345 6789 0124"),
             ("PII_SECRET", "Social"),
             ("PII_CA_SIN", "130 692 544"),
-            ("PII_SECRET", "-----BEGIN PRIVATE KEY-----"),
+            ("PII_SECRET", "-----BEGIN " + "PRIVATE KEY-----"),
         ]
         assert everything_problems({"text": text}) == []

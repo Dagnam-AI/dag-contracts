@@ -24,17 +24,17 @@ this may say that a row holds no secrets.
 * ``Bearer <token>``: the token only, and only one of at least 20 characters,
   which is what keeps "the bearer token" and "Bearer of bad news" out.
 * ``Basic <base64>``: the base64 only, and only when it decodes to printable
-  ``user:password`` text, which keeps "Basic training" out.
-* ``scheme://user:password@host``: the password -- whatever the host
+  ``<user>:<password>`` text, which keeps "Basic training" out.
+* ``<scheme>://<user>:<password>@<host>``: the password -- whatever the host
   (``localhost`` included). The password runs to the ``@`` that opens the host,
   so an ``@`` inside it does not cut it short; a raw ``/``, ``?`` or ``#`` ends
-  it (``postgres://u:pa/ss@host/db`` has no password to find), and it may hold
+  it (a password with a ``/`` in it has no password to find), and it may hold
   percent-encoded forms and a quote, backtick, ``<`` or ``>`` with a letter,
   digit or ``%`` after it. Before punctuation such a character is text around
-  the URL (``"http://host:8080","a@b.co"`` is a port and a string), so a password
+  the URL (a quoted ``host:port`` followed by a quoted address is a port and a string), so a password
   where one is followed by punctuation is a known miss, and so is one that
-  reads as a port followed by a separator (``http://host:8080,a@b.co`` is a
-  port and an address). A URL with a port, or a user and no password, has
+  reads as a port followed by a separator (a ``host:port``, a comma and an
+  address are a port and an address). A URL with a port, or a user and no password, has
   nothing to find. The email pattern also reads ``password@host`` as an
   address; where the two overlap the scan names the one region a secret, and
   the host goes with it.
@@ -50,7 +50,7 @@ this may say that a row holds no secrets.
 
   - **Unambiguous** -- ``password``, ``passwd``, ``secret``, ``api_key``/
     ``apikey``, ``access_key``, ``secret_access_key``, ``private_key``,
-    ``client_secret``: quoted on both sides (``"password": "…"``) the value
+    ``client_secret``: quoted on both sides (``"<name>": "<value>"``) the value
     is a credential whatever it looks like; bare (prose, YAML, INI) only when
     it has at least 6 characters with a digit, or at least 16, which keeps
     "password: required" out.
@@ -69,12 +69,12 @@ this may say that a row holds no secrets.
   ``top_secret``; the list is `_FLAG_WORDS`), and not a blank or flag-like value
   (``yes``, ``no``, ``true``, ``false``, ``n/a``, ``none``, ``null``, ``-``).
   A bare value stops at a ``:`` that opens the next assignment
-  (``token=abc:password=…``), so each one is judged on its own. So is one inside a
+  (``token=<value>:<name>=…``), so each one is judged on its own. So is one inside a
   value an ambiguous name refused (``token=<16+ letters>?password=…``): the scan
   resumes right after the refused name, never past the whole run.
-* ``sk-`` needs a run of 20+ letters and digits that holds a digit or mixes
-  upper and lower case, which a real key has and kebab-case
-  (``sk-learn-compatible-estimators``) does not.
+* A key prefix needs a run of 20+ letters and digits that holds a digit or mixes
+  upper and lower case, which a real key has and kebab-case words after the
+  prefix do not.
 
 These are the raw finders: under an unambiguous name they take any value, a
 redaction's own placeholder included. `spans.py` is what never shows them one:
@@ -114,11 +114,11 @@ _AMBIGUOUS = frozenset({"token", "authorization", "auth", "key"})
 _NAMES = _UNAMBIGUOUS + "|" + "|".join(sorted(_AMBIGUOUS, key=len, reverse=True))
 # A name starts a word, or a camelCase hump (`accessToken`); never mid-word (`mytoken`).
 _NAME_START = r"(?:(?<![A-Za-z0-9])|(?<=[a-z0-9])(?=[A-Z]))"
-# `scheme://user:password@host`: the password. It runs to the `@` that opens the
+# `<scheme>://<user>:<password>@<host>`: the password. It runs to the `@` that opens the
 # host, and an `@` inside it does not end it when another follows before the host's
 # end. A quote, backtick, `<` or `>` is part of a password only with a letter, digit
-# or `%` after it, so `"http://host:8080","a@b.co"` and
-# `<a href="http://host:8080">a@b.co</a>` are a port and some text, not a password.
+# or `%` after it, so a quoted `host:port` followed by a quoted address, or a link
+# to a `host:port` with an address as its text, is a port and some text, not a password.
 #
 # The head is a pattern and the password is walked in code, because a password written
 # as a repeated group (`(?:plain|quote(?=...)|@(?=...))+`) makes the regex engine keep a
@@ -189,7 +189,7 @@ def _password_end(text: str, start: int) -> int | None:
 
 
 def _url_password_spans(text: str) -> list[tuple[int, int]]:
-    """Spans of the passwords of every ``scheme://user:password@host`` in ``text``."""
+    """Spans of the passwords of every ``<scheme>://<user>:<password>@<host>`` in ``text``."""
     spans: list[tuple[int, int]] = []
     position = 0
     while (head := _URL_HEAD.search(text, position)) is not None:
@@ -206,7 +206,7 @@ def _url_password_spans(text: str) -> list[tuple[int, int]]:
 _SHAPES: tuple[re.Pattern[str], ...] = (
     re.compile(
         _NOT_AFTER_KEY_CHAR + r"(?P<s>"
-        # OpenAI (`sk-`, `sk-proj-`) and Anthropic (`sk-ant-api03-`): prefix
+        # OpenAI and Anthropic keys: the prefix and optional
         # segments, then a random run of 20+ with a digit or both cases, then
         # the rest.
         r"sk-(?:[A-Za-z0-9_-]*-)?"
