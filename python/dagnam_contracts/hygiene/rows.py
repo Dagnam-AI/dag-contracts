@@ -41,7 +41,8 @@ def _named(
     the rule takes the member the value becomes one placeholder, whose text is empty,
     so the rescan's rule is false; when it does not, the output value is the redacted
     form, and the rescan reads that same text. The first reading is what keeps
-    `{"password": "a@b.co"}` one secret and `{"auth": "Bearer <token>"}` the whole value.
+    a member with an unambiguous name and an address as its value one secret, and
+    one with an ambiguous name and `Bearer <token>` as its value the whole value.
     The keys are likewise a document member's key as given and as redacted (the rescan's
     key is the redacted one, which the first reading tried too).
     """

@@ -68,6 +68,14 @@ before 0.4.0 are described in `README.md`.
   order, similarities) is unchanged. The memory that remains is the result itself, which
   lists every pair of identical rows (about 70 bytes a pair): it still grows with the
   square of the identical rows, and `MAX_PAIRS` bounds it.
+- **No file of the repository holds credential-shaped text.** The tests that need the
+  shape of a key, a password in a URL or a header now put the text together at run time,
+  from pieces, and the prose of this file, the README and the docstrings writes
+  `<name>` and `<value>` where it showed an example. What the tests pin is unchanged
+  (the same inputs reach the same code, and the reference corpus is byte for byte the
+  same). `tests/hygiene/test_repo_credential_free.py` reads every tracked text file with
+  the package's own finder and three marker scans and fails with `file:line` when one
+  holds such text.
 
 ## [0.6.0] - 2026-11-17
 
@@ -152,8 +160,8 @@ before 0.4.0 are described in `README.md`.
 
   That holds for text of any kind, down to an address spelt with punctuation alone
   (`_@_._`) hiding behind another address, and for a member of a document whose
-  key is itself a finding: `{"alice@example.com_password": "hunter2"}` has its
-  value replaced as it did in 0.4.0, because the rule that takes a member whole
+  key is itself a finding: a member whose key is an address followed by `_<name>`
+  (a credential name) has its value replaced as it did in 0.4.0, because the rule that takes a member whole
   reads the key as given as well as redacted.
 
   With 0.4.0 a list of `+` phone numbers one space or hyphen apart had only its
@@ -219,23 +227,23 @@ before 0.4.0 are described in `README.md`.
   between placeholders on its own (the first four) or is a rule and a pattern
   change (the last two).
   - *A finding next to another is found in the same scan.* The second finding in
-    `+44 20 7946 0958 +44 20 7946 0958` and in `password: hunter22 +1 415-555-0132`
+    `<phone> <phone>` and in `<name>: <value> <phone>`
     was hidden from its own pattern by the last digit of the first; 0.4.0
     redacted the first and left the second, and its rescan then counted it.
-    `Pwd=letmein4 4111111111111111` found neither. All three now count two
+    `<name>=<value> <card number>` found neither. All three now count two
     findings and are redacted whole: `[REDACTED:PII_PHONE] [REDACTED:PII_PHONE]`,
-    `password: <SECRET> [REDACTED:PII_PHONE]`, `Pwd=<SECRET> [REDACTED:PII_PAYMENT_CARD]`.
-    A card glued to a PEM block (`4111111111111111-----BEGIN PRIVATE KEY-----...`)
+    `<name>: <SECRET> [REDACTED:PII_PHONE]`, `<name>=<SECRET> [REDACTED:PII_PAYMENT_CARD]`.
+    A card glued to a PEM block (the card's digits, then the block's first line)
     is found with it; 0.4.0 found the block and its rescan then found the card.
-  - *A placeholder is never part of a finding.* `password: <SECRET>`,
-    `password: [REDACTED:PII_EMAIL]` and `{"password": "<SECRET>"}` count nothing
+  - *A placeholder is never part of a finding.* `<name>: <SECRET>`,
+    `<name>: [REDACTED:PII_EMAIL]` and `{"<name>": "<SECRET>"}` count nothing
     (0.4.0: one secret in the last two, which stopped the workload on its own
     output). Text glued to a placeholder is read on its own, so
-    `password=[REDACTED:PII_EMAIL]!x` counts nothing and is left as it is
+    `<name>=[REDACTED:PII_EMAIL]!x` counts nothing and is left as it is
     (0.4.0: one secret, and the placeholder swallowed into it).
   - *A policy acts on what the scan reports.* The scan and every policy resolve
     every class, and a policy then acts on its own. `{"PII_PHONE": "redact"}` on
-    `password: hunter22 +1 415-555-0132` redacts the phone number (0.4.0 never
+    `<name>: <value> <phone>` redacts the phone number (0.4.0 never
     reported it, so a phone-only policy left it); `{"PII_PHONE": "drop"}` drops
     that row. A `drop` and a `redact` class together still drop the row.
   - *A document that parses only once another finding is replaced is read as a
@@ -246,11 +254,11 @@ before 0.4.0 are described in `README.md`.
   - *A URL password and the address read over it are one finding, a secret.* The
     email pattern reads `pw@ftp.example.com` as an address and the URL pattern
     reads `pw` as a password; where they overlap the region is one `PII_SECRET`,
-    so `ftp://anonymous:pw@ftp.example.com/` becomes `ftp://anonymous:<SECRET>/`
-    and `mysql://root:toor@10.0.0.7:3306/app` becomes `mysql://root:<SECRET>:3306/app`.
+    so `ftp://<user>:<password>@ftp.example.com/` becomes `ftp://<user>:<SECRET>/`
+    and a URL with an address as its host and a port becomes `mysql://<user>:<SECRET>:3306/app`.
     0.4.0 redacted the same span as `PII_EMAIL` (`ftp://anonymous:[REDACTED:PII_EMAIL]/`).
     A host with no dot, or in brackets, is not an address and stays:
-    `postgres://user:<SECRET>@localhost/db`. No pattern consults another class,
+    `postgres://<user>:<SECRET>@localhost/db`. No pattern consults another class,
     so an email-only policy leaves that URL alone.
   - *A keyword class may open right after a digit.* `1987DOB: 14/03/1987`,
     `order 9SIN 130 692 544` and `id 9Aadhaar Number 580927525309` are found
@@ -263,9 +271,9 @@ before 0.4.0 are described in `README.md`.
   `passwd`, `secret`, `api_key`, `access_key`, `secret_access_key`,
   `private_key` or `client_secret`, or ends in one as a word of its own
   (`db_password`, `userPassword`, `aws-secret-access-key`), in the row and in
-  every object nested in it: `{"password": "correcthorse"}` becomes
-  `{"password": "<SECRET>"}`, and `{"apiKey": 12345}` becomes
-  `{"apiKey": "<SECRET>"}`. Three limits keep a column that is not a
+  every object nested in it: `{"<name>": "<value>"}` becomes
+  `{"<name>": "<SECRET>"}`, and a number under a key named like an API key becomes
+  the same placeholder. Three limits keep a column that is not a
   credential out of it:
   - A name that opens with `has`, `is`, `needs`, `requires`, `use`, `allow`,
     `enable`, `enabled`, `show`, `with`, `no` or `top` is a flag or a label,
@@ -302,8 +310,8 @@ before 0.4.0 are described in `README.md`.
   - Issue messages and their order are unchanged. Keys that are not strings
     are now ordered as text, and no longer raise when their types are mixed.
 - **`PII_SECRET` finds three more formats.**
-  - The password of a URL, `scheme://user:password@host`, whatever the host
-    (`postgres://user:...@localhost` was missed: no dot, so not even the
+  - The password of a URL, `scheme://<user>:<password>@<host>`, whatever the host
+    (`postgres://<user>:<password>@localhost` was missed: no dot, so not even the
     email pattern touched it). The password runs to the `@` that opens the
     host, so an `@` inside it does not end it, and a raw `/`, `?` or `#` ends it.
     It may be percent-encoded, and may hold a quote, a backtick, `<` or `>` when
@@ -311,11 +319,11 @@ before 0.4.0 are described in `README.md`.
     the text around the URL, not a password: `"http://host:8080","a@b.co"`
     is a port and a string, so a password where one is followed by
     punctuation is not found. Nor is one that begins like a port and a
-    separator: `http://localhost:8080,john@example.com` is a port and an
-    address, an email under every policy, as in 0.4.0. A URL with a port, or a
+    separator: a `host:port` followed by a comma, a name and `@example.com` is a
+    port and an address, an email under every policy, as in 0.4.0. A URL with a port, or a
     user and no password, has none. With a dotted host the host goes with the
     password (see the deliberate differences above).
-  - A connection string's `pwd=` (`Uid=sa;Pwd=...`, `?user=x&pwd=...`),
+  - A connection string's `pwd=` (after `Uid=<user>;`, or after `?user=<user>&`),
     written with no space around the `=`. A value that starts like a path or
     a variable is the shell's working directory and is left alone, and `pwd`
     is not a credential name anywhere else (`pwd: ...`, a JSON key).
@@ -334,14 +342,14 @@ Where one side redacts and the other scans again, upgrade the side that scans
 first. A client on 0.4.0 against a platform on 0.4.1 is told to upgrade: the
 platform counts what 0.4.0 left in a row (a finding next to another, a URL
 password that 0.4.0's email pattern did not take, as when the host has no dot or
-the password ends in `!` or `$` (`postgres://app:Passw0rd!@db.example.com/x`), a `pwd=`
+the password ends in `!` or `$` (`postgres://<user>:<password>!@db.example.com/x`), a `pwd=`
 assignment, an `xoxe-` token, a capital `Aadhaar Number`, a value under a
 credential column of a structured row, a keyword after a digit, a document that
 parses only after redaction, a card glued to a PEM block) and stops the
 workload, and the cure is `dagnam-contracts` 0.4.1 in the client. A client on
 0.4.1 against a platform on 0.4.0 stops on its redacted credentials instead:
 0.4.0 counts its own `<SECRET>` as the value of a quoted credential-named member
-(`"password": "<SECRET>"`, in text or in a JSON document held in a string), and
+(`"<name>": "<SECRET>"`, in text or in a JSON document held in a string), and
 in a few shapes a bare one followed by text, so the platform upgrades first.
 Every other row a 0.4.1 client redacts is clean to 0.4.0, because what 0.4.1
 leaves in text is text 0.4.0 left too, including the numbers described in Known
@@ -382,8 +390,8 @@ not. With 0.4.1 on both sides, and both calling from an ordinary stack, no row s
   parenthesis and the area code as the end of the first, leaving `) 555-0132`
   behind. 0.4.0 does the same; a list of numbers one space or hyphen apart is
   found whole, and so is a parenthesised number after one.
-- An address after `host:port` and a dot or an equals sign (`http://h:8080.john@x.co`)
-  is read as a URL password, since `8080.john` and `8080=john` are passwords as
+- An address after `host:port` and a dot or an equals sign (`host:8080.<name>@<host>`)
+  is read as a URL password, since `8080.<name>` and `8080=<name>` are passwords as
   much as anything else: redacting everything removes it as a secret, and an
   email-only policy leaves it. A comma, semicolon, bar, ampersand or closing angle
   bracket after the port is not a password and the address is an email.
@@ -397,9 +405,9 @@ not. With 0.4.1 on both sides, and both calling from an ordinary stack, no row s
   credential key whose name an earlier finding hid (an address glued to
   `_password`) is left, as 0.4.0 leaves it; a string under the same key is replaced.
 - `pwd=` is read as a credential wherever it is written with no space around
-  the `=`, so a keyword argument in code (`zf.extractall(path, pwd=None)`,
-  `run(cmd, pwd=pwd)`) is redacted, and a quoted or braced value with spaces in
-  it (`Pwd="my pass phrase";`) is replaced only to its first space.
+  the `=`, so a keyword argument in code (one that passes `None`, or a variable
+  of the same name) is redacted, and a quoted or braced value with spaces in
+  it (a quoted run of several words) is replaced only to its first space.
 - A missing value written `nan` (a float NaN, or the string) and a mask
   (`********`, `REDACTED`) under a credential column are counted and replaced
   as secrets.
@@ -416,7 +424,7 @@ not. With 0.4.1 on both sides, and both calling from an ordinary stack, no row s
   with a `snake_`/`kebab-` prefix or camelCased. The names are of two kinds:
   - **Unambiguous** (`password`, `passwd`, `secret`, `api_key`/`apikey`,
     `access_key`, `secret_access_key`, `private_key`, `client_secret`):
-    quoted on both sides (`"password": "…"`) the value is a credential
+    quoted on both sides (`"<name>": "<value>"`) the value is a credential
     whatever it looks like; bare (prose, YAML, INI) only when it has at
     least 6 characters with a digit, or at least 16.
   - **Ambiguous** (`token`, `authorization`, `auth`, `key`): only a value that
@@ -428,9 +436,9 @@ not. With 0.4.1 on both sides, and both calling from an ordinary stack, no row s
     `{"authorization": "Bearer eyJ…"}` are redacted.
 
   A bare value stops at a `:` that opens the next assignment, so in
-  `token=abc:password=hunter22` each assignment is judged on its own. Bare,
-  `sk-` needs a 20-character run that holds a digit or mixes upper and lower
-  case, so kebab-case such as `sk-learn-compatible-estimators` is not one.
+  `token=<value>:<name>=<value>` each assignment is judged on its own. Bare,
+  a key prefix needs a 20-character run that holds a digit or mixes upper and lower
+  case, so kebab-case such as `scikit-learn-compatible-estimators` after it is not one.
   Hex digests, UUIDs and
   ordinary words do not match. A redacted secret reads `<SECRET>`, not
   `[REDACTED:<code>]`. It is in `PII_CODES`, so every policy built from that
@@ -439,7 +447,7 @@ not. With 0.4.1 on both sides, and both calling from an ordinary stack, no row s
 - **Credential-named JSON members.** In a JSON object or array held in a row,
   the value of a member whose key is named like a credential is a
   `PII_SECRET` by the same two-kind rule -- whatever it looks like under an
-  unambiguous name (`{"password": "a"}`, `{"apiKey": 12345}`), only when it
+  unambiguous name (a one-letter string, a number), only when it
   looks like a credential under an ambiguous one -- and is replaced whole;
   the scan counts it too.
 - **`PiiDetector.placeholder`** (what a redaction writes for that class;

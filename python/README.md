@@ -80,8 +80,8 @@ value (`yes`, `no`, `true`, `n/a`, `none`, `-`) are not secrets. A name an id
 column also carries (`row_key`, `nextPageToken`) decides nothing there, a bare
 number in a row is not scanned, and a row's keys are left as they are. A URL's
 password is replaced as a secret; with a dotted host the host goes with it
-(`ftp://anonymous:pw@ftp.example.com/` becomes `ftp://anonymous:<SECRET>/`),
-because the email pattern reads `pw@ftp.example.com` as an address and the two
+(`ftp://<user>:<password>@ftp.example.com/` becomes `ftp://<user>:<SECRET>/`),
+because the email pattern reads `<password>@ftp.example.com` as an address and the two
 overlap.
 A placeholder is an opaque token, and a finding is decided on the text between
 placeholders, read as a string of its own. So rows redacted for every class

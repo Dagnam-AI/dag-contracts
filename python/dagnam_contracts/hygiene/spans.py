@@ -66,10 +66,11 @@ _BY_CODE = {detector.code: detector for detector in PII_DETECTORS}
 
 # What a piece of text must hold before any detector can find anything in it: a letter or a
 # digit, or an at sign. The address pattern needs no letter or digit (`_@_._` is one), and
-# neither does a URL's password (`://:-@`), but both need the at sign; every other class
-# needs a letter or a digit. Narrower than the union of the patterns' required characters
-# would hide a finding from the read that decides it (`test_spans.py` enumerates each
-# class's shortest match and fuzzes the converse), so this is derived from them, not guessed.
+# neither does a URL's password (one hyphen between the colon and the at sign), but both
+# need the at sign; every other class needs a letter or a digit. Narrower than the union of
+# the patterns' required characters would hide a finding from the read that decides it
+# (`test_spans.py` enumerates each class's shortest match and fuzzes the converse), so this
+# is derived from them, not guessed.
 _CAN_HOLD_A_FINDING = re.compile(r"[^\W_]|@")
 
 
