@@ -6,7 +6,8 @@ rows than `MAX_TEXTS`, a row whose string values hold more than `MAX_TEXT_CHARS`
 characters, or more than `MAX_TOTAL_CHARS` in all; the same two limits are read again on
 the normalised text, which casefolding can lengthen. On the Python path the walk is
 refused when it has compared `MAX_COMPARISONS` candidate pairs, or found more than
-`MAX_PAIRS` near-duplicate pairs; for the core the pair limit is read when it returns. The
+`MAX_PAIRS` near-duplicate pairs; the core enforces those two itself (`test_backend.py`
+holds the exception it raises to this package's). The
 error says which limit and its value, and never a word of the rows.
 """
 
@@ -202,18 +203,3 @@ class TestThePairs:
             compute_near_duplicates(_rows(*[_PLANTED] * 60))
         assert len(compared) == 4
         assert _PLANTED not in str(raised.value)
-
-    @pytest.mark.parametrize(("pairs", "refused"), [(3, False), (4, True)])
-    def test_the_core_s_pairs_are_held_to_the_same_limit(
-        self, monkeypatch: pytest.MonkeyPatch, pairs: int, refused: bool
-    ) -> None:
-        monkeypatch.setattr(near_dedup, "MAX_PAIRS", 3)
-        found = [(0, i + 1, 1.0) for i in range(pairs)]
-        core = SimpleNamespace(near_duplicates=lambda texts, threshold: ([1, 2], found))
-        monkeypatch.setattr(_backend, "active", lambda: core)
-
-        if refused:
-            with pytest.raises(NearDedupLimitError, match="MAX_PAIRS"):
-                compute_near_duplicates(_rows("a", "b", "c"))
-        else:
-            assert len(compute_near_duplicates(_rows("a", "b", "c")).pairs) == 3

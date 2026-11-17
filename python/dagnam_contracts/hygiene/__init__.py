@@ -1,10 +1,10 @@
 """Dataset hygiene: PII scan/policy, exact and near duplicates, split contamination.
 
 Every module here is pure Python over the standard library — no session, no
-I/O, no required third-party dependency — so the platform, the SDK, and any offline
-audit tool reach the same verdict on the same rows. With the optional `fast` extra
-the PII scan, MinHash and near-duplicate search run in the compiled `dagnam-core`
-instead (`backend()` says which); the Python here stays the reference. `dedup.canonical_row_hash`
+I/O, no third-party import — so the platform, the SDK, and any offline audit tool reach
+the same verdict on the same rows. The PII scan, MinHash and near-duplicate search run in
+the compiled `dagnam-core` (this package's one dependency) when it is usable, and in the
+Python here otherwise (`backend()` says which); the Python stays the reference. `dedup.canonical_row_hash`
 is the one definition of "identical" that `dedup` and `contamination` share.
 """
 

@@ -37,7 +37,8 @@ _OLD_BARE = re.compile(
 def bare_walk_before_r1(text: str) -> list[tuple[str, int, int]]:
     """`cred._bare_assignments` as it was: every value `_OLD_BARE` finds consumes its whole
     run, one an ambiguous name refuses included, and only then is a name asked whether it
-    vouches. The compiled core (`dagnam-core` 0.1.1) still reads text this way."""
+    vouches. The compiled core before 0.2.0 read text this way; it is kept to check
+    that the new walk loses nothing."""
     return [
         (match["n"], *match.span("s"))
         for match in _OLD_BARE.finditer(text)

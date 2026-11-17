@@ -1,13 +1,15 @@
 """The canonical Dagnam.AI component/parameter validation contract.
 
 Ships the generated ``component-schema.json`` plus a **pydantic-free**
-interpreter of it. The dependency-free constraint is load-bearing, not
-incidental: the ``dagnam`` SDK deliberately carries only ``requests`` and
-``numpy``, so anything it depends on must stay light.
+interpreter of it. The Python here has no third-party imports; the one dependency is the
+compiled ``dagnam-core`` (exactly pinned), which runs the hygiene hot paths and falls back
+to this Python on any platform without a native wheel. Keeping the package light is
+load-bearing, not incidental: the ``dagnam`` SDK deliberately carries only ``requests`` and
+``numpy``.
 
 The Pydantic ``ComponentSpec`` registry that *produces* this schema lives in
-``registry/`` and is an AUTHORING format — it is never packaged, which is what
-lets this distribution have no runtime dependencies at all.
+``registry/`` and is an AUTHORING format — it is never packaged, so this distribution
+never depends on Pydantic.
 
 Public API mirrors what the SDK previously exposed from ``dagnam._contracts``,
 so a consumer switching to this package changes its import path and nothing else.

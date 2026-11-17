@@ -51,9 +51,10 @@ There are no copies left to drift.
 **The Pydantic registry is an authoring format that compiles to JSON and never
 ships.** That single decision is what makes the rest work:
 
-- The published Python package has **no pydantic dependency**, so the `dagnam`
-  SDK stays light — a hard constraint, since the SDK deliberately ships with
-  only `requests` and `numpy`.
+- The published Python package has **no pydantic dependency**: its one dependency
+  is the compiled `dagnam-core` (a wheel, or a stub that makes the package run its own
+  Python where there is no native wheel), so the `dagnam` SDK stays light — the SDK
+  deliberately ships with only `requests` and `numpy`.
 - The JSON is the interlingua. Each runtime interprets it in its own idiom, so
   adding a fourth runtime costs **one interpreter**, not another copy of the
   rules.

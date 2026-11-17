@@ -7,8 +7,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  # A daily run on main, so the differential test of the compiled backend has a run for every
-  # day it has stayed green (the gate before the backend becomes a default dependency counts them).
+  # A daily run on main: the compiled core is a default dependency now. The core is pinned
+  # exactly, so a new core release never reaches this workflow; what the daily run catches is a
+  # change of the interpreters, the runner images or PyPI's wheels for the pinned core.
   schedule:
     - cron: "17 5 * * *"
   # The release workflow calls this file, so a tag cannot publish a commit
@@ -18,6 +19,10 @@ on:
 # Least privilege: no job here writes to the repository.
 permissions:
   contents: read
+
+env:
+  # The version of uv the wheel and install jobs use, the one dag-core's workflows pin.
+  UV_VERSION: "0.13.6"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -117,35 +122,134 @@ jobs:
           print(f'ok: {len(c.COMPONENT_REGISTRY)} components, schema v{c.SCHEMA_VERSION}')
           "
 
-      # The `fast` extra must resolve from the wheel's own metadata and put the compiled
-      # core to work; a metadata typo would otherwise ship in an immutable release. Run
-      # from an empty directory, for the reason above, and through the package: one real
-      # findings call proves the core answers, not merely that it imported. The same
-      # script under DAGNAM_CONTRACTS_PURE must give the same answer on the Python.
-      - name: Install the wheel with the fast extra
+      # `dagnam-contracts[fast]` is an alias of the default dependency, kept for the users who
+      # installed it under 0.6.0: the extra must still resolve from the wheel's own metadata
+      # and put the compiled core to work. The default install, on every platform and
+      # interpreter, is the `install` matrix below. Run from an empty directory, for the
+      # reason above, through the package; the same script under DAGNAM_CONTRACTS_PURE must
+      # give the same answer on the Python.
+      - name: Install the wheel with the fast alias
         working-directory: python
         run: |
           python -m venv /tmp/fast
           /tmp/fast/bin/pip install --quiet "$(ls "$PWD"/dist/*.whl)[fast]"
           cd "$(mktemp -d)"
-          cat > check_fast.py <<'PY'
-          import os
-          import sys
+          EXPECT_BACKEND=rust /tmp/fast/bin/python "$GITHUB_WORKSPACE/.github/scripts/check_wheel.py"
+          EXPECT_BACKEND=python DAGNAM_CONTRACTS_PURE=1 /tmp/fast/bin/python "$GITHUB_WORKSPACE/.github/scripts/check_wheel.py"
 
-          import dagnam_contracts
-          from dagnam_contracts.hygiene import backend
-          from dagnam_contracts.hygiene.spans import findings
+  # The wheel is built once and installed everywhere below: the BUILT wheel, from a clean
+  # directory, with its one dependency (`dagnam-core`) resolved from PyPI like a user's pip
+  # would, never the source tree.
+  wheel:
+    name: Build the wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-          assert "site-packages" in dagnam_contracts.__file__, dagnam_contracts.__file__
-          expected = os.environ["EXPECT_BACKEND"]
-          assert backend() == expected, (backend(), expected)
-          assert ("dagnam_core.hygiene" in sys.modules) == (expected == "rust")
-          spans = [(s, e, d.code) for s, e, d in findings("write to jane@example.com today")]
-          assert spans == [(9, 25, "PII_EMAIL")], spans
-          print("ok:", backend(), spans)
-          PY
-          EXPECT_BACKEND=rust /tmp/fast/bin/python check_fast.py
-          EXPECT_BACKEND=python DAGNAM_CONTRACTS_PURE=1 /tmp/fast/bin/python check_fast.py
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Build
+        working-directory: python
+        run: uv build --wheel
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wheel
+          path: python/dist/*.whl
+          if-no-files-found: error
+
+  # `dagnam-core` is a default dependency, so a plain install must work, and run the compiled
+  # core, wherever the core has a native wheel: Linux x86_64 and arm64, macOS arm64 and x86_64,
+  # Windows x86_64, on every CPython the package supports (the runner labels are dag-core's).
+  # Where it has none (free-threaded 3.13) pip and uv take its stub wheel, `--no-build` makes
+  # a build of the sdist a failure here, and the package must run on its Python.
+  install:
+    name: Install on ${{ matrix.runner }}, Python ${{ matrix.py }}
+    needs: wheel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-latest]
+        py: ["3.12", "3.13", "3.14"]
+        include:
+          - { runner: ubuntu-latest, py: "3.14t" }
+          - { runner: ubuntu-latest, py: "3.13t", stub: "1" }
+    env:
+      PY: ${{ matrix.py }}
+      EXPECT_STUB: ${{ matrix.stub || '0' }}
+      EXPECT_BACKEND: ${{ matrix.stub == '1' && 'python' || 'rust' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wheel
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          # No cache: the core must be resolved from PyPI fresh, as a user's install is.
+          enable-cache: false
+
+      - name: Install the wheel into a clean environment and use it
+        run: |
+          uv python install "$PY"
+          uv venv --python "$PY" .venv-install
+          uv pip install --python .venv-install --no-build dist/*.whl
+          uv pip list --python .venv-install
+          if [ "$RUNNER_OS" = Windows ]; then vpy="$PWD/.venv-install/Scripts/python.exe"; else vpy="$PWD/.venv-install/bin/python"; fi
+          script="$PWD/.github/scripts/check_wheel.py"
+          cd "$(mktemp -d)"
+          "$vpy" "$script"
+          if [ "$EXPECT_BACKEND" = rust ]; then
+            EXPECT_BACKEND=python DAGNAM_CONTRACTS_PURE=1 "$vpy" "$script"
+          fi
+
+  # musl: the wheels of the core for Alpine, in an Alpine container (the image is dag-core's).
+  install-musl:
+    name: Install on Alpine (musl)
+    needs: wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: wheel
+          path: dist/
+
+      - name: Install the wheel in Alpine and use it
+        run: |
+          docker run --rm -e EXPECT_BACKEND=rust -v "$PWD/dist:/dist:ro" -v "$PWD/.github/scripts:/scripts:ro" \
+            python:3.12-alpine@sha256:c5ba3deef00c7758561a0f03c26f44f10589263d40e732b8748e0d1f38f6dd89 sh -euc '
+            python -m venv /tmp/venv
+            /tmp/venv/bin/pip install --quiet --only-binary :all: /dist/*.whl
+            cd /tmp
+            /tmp/venv/bin/python /scripts/check_wheel.py
+            DAGNAM_CONTRACTS_PURE=1 EXPECT_BACKEND=python /tmp/venv/bin/python /scripts/check_wheel.py'
 
   npm:
     name: npm distribution

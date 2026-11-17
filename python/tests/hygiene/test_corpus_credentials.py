@@ -21,10 +21,8 @@ from corpus_credentials import shape
 from corpus_regions import active_values, leaks, line_safe, regions
 from export_corpus import export
 import pytest
-from test_credentials_flat import bare_walk_before_r1
 from test_export_corpus import ALL_NAMES, MARKERS, Corpus, _read
 
-from dagnam_contracts.hygiene import _backend, credentials
 from dagnam_contracts.hygiene.spans import findings
 
 # The formats of the finder (hygiene/credentials.py) that a case must pin, and the least
@@ -61,17 +59,7 @@ def _cases(corpus: Corpus) -> list[dict[str, Any]]:
 
 
 def _spans(text: str) -> list[list[Any]]:
-    """What the active backend reports for the text; for a text the R1 fix reads differently
-    (`test_credentials_refused.py`), what the Python reference reports.
-
-    TEMPORARY, with `test_differential.py`'s ``assume``: the pinned compiled core
-    (`dagnam-core` 0.1.1) still reads those texts as before, and the corpus holds it to the
-    new answer from its own repository. When the pin moves to a core that has the fix,
-    the canary in `test_differential.py` fails: delete this branch then.
-    """
-    if credentials._bare_assignments(text) != bare_walk_before_r1(text):
-        with _backend.reference():
-            return [[s, e, d.code] for s, e, d in findings(text)]
+    """What the active backend reports for the text, as the corpus records it."""
     return [[s, e, d.code] for s, e, d in findings(text)]
 
 

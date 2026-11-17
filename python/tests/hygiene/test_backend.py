@@ -21,9 +21,11 @@ from typing import Any, cast
 
 import pytest
 
-from dagnam_contracts.hygiene import _backend, backend
+from dagnam_contracts.hygiene import _backend, _limits, backend, near_dedup
 from dagnam_contracts.hygiene.near_dedup import (
+    MAX_PAIRS,
     NUM_PERMUTATIONS,
+    NearDedupLimitError,
     NearDedupResult,
     NearDuplicatePair,
     compute_near_duplicates,
@@ -54,11 +56,21 @@ def _reload(
     return importlib.reload(_backend)
 
 
-def _fake(api: int, **replace: Any) -> types.ModuleType:
-    """A `dagnam_core` whose `hygiene` has the contract's number and its three functions."""
+class _CoreLimitError(ValueError):
+    """The core's own `NearDedupLimitError`: a class of its own, as the compiled one is."""
+
+
+_LIMITS = ("MAX_TEXTS", "MAX_TEXT_CHARS", "MAX_TOTAL_CHARS", "MAX_COMPARISONS", "MAX_PAIRS")
+
+
+def _fake(api: int = 2, replace: dict[str, Any] | None = None) -> types.ModuleType:
+    """A `dagnam_core` whose `hygiene` is what `_backend` requires: the contract's number, the
+    three functions, the tables, the exception and this package's five limits."""
     core = types.ModuleType("dagnam_core")
-    functions = {name: lambda *_: None for name in _backend._FUNCTIONS}
-    vars(core)["hygiene"] = types.SimpleNamespace(CORE_API=api, **{**functions, **replace})
+    attributes: dict[str, Any] = {name: lambda *_: None for name in _backend._FUNCTIONS}
+    attributes.update({name: getattr(_limits, name) for name in _LIMITS})
+    attributes.update(UNICODE_SUPPORTED=True, NearDedupLimitError=_CoreLimitError)
+    vars(core)["hygiene"] = types.SimpleNamespace(CORE_API=api, **{**attributes, **(replace or {})})
     return core
 
 
@@ -83,22 +95,69 @@ def test_python_is_used_when_the_core_is_not_installed(monkeypatch: pytest.Monke
 def test_python_is_used_when_the_variable_is_on(
     monkeypatch: pytest.MonkeyPatch, value: str
 ) -> None:
-    assert _reload(monkeypatch, _fake(1), value).active() is None
+    assert _reload(monkeypatch, _fake(), value).active() is None
 
 
 @pytest.mark.parametrize("value", ["", "0", "false", "False", "no", "OFF", " 0 "])
 def test_the_core_is_used_when_the_variable_is_off(
     monkeypatch: pytest.MonkeyPatch, value: str
 ) -> None:
-    assert _reload(monkeypatch, _fake(1), value).backend() == "rust"
+    assert _reload(monkeypatch, _fake(), value).backend() == "rust"
 
 
 def test_a_core_without_the_functions_is_not_used(monkeypatch: pytest.MonkeyPatch) -> None:
     bare = types.ModuleType("dagnam_core")
-    vars(bare)["hygiene"] = types.SimpleNamespace(CORE_API=1)
+    vars(bare)["hygiene"] = types.SimpleNamespace(CORE_API=_backend.CORE_API)
     assert _reload(monkeypatch, bare, None).active() is None
     for name in _backend._FUNCTIONS:
-        assert _reload(monkeypatch, _fake(1, **{name: None}), None).active() is None
+        assert _reload(monkeypatch, _fake(replace={name: None}), None).active() is None
+
+
+def test_the_stub_is_not_used_and_is_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The core's stub wheel installs on a platform with no native wheel, and importing its
+    # `hygiene` raises ImportError (here: the submodule cannot be imported).
+    stub = types.ModuleType("dagnam_core")
+    monkeypatch.setitem(sys.modules, "dagnam_core.hygiene", cast("types.ModuleType", None))
+    module = _reload(monkeypatch, stub, None)
+    assert module.active() is None and module.backend() == "python"
+
+
+def test_an_error_other_than_import_error_is_not_swallowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Broken(types.ModuleType):
+        def __getattr__(self, name: str) -> Any:
+            raise RuntimeError("a broken core")
+
+    with pytest.raises(RuntimeError, match="a broken core"):
+        _reload(monkeypatch, Broken("dagnam_core"), None)
+
+
+def test_a_core_without_tables_for_this_interpreter_is_not_used(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _reload(monkeypatch, _fake(replace={"UNICODE_SUPPORTED": False}), None)
+    assert module.active() is None and module.backend() == "python"
+    assert _reload(monkeypatch, _fake(replace={"UNICODE_SUPPORTED": None}), None).active() is None
+
+
+@pytest.mark.parametrize("error", [None, RuntimeError, "NearDedupLimitError", object()])
+def test_a_core_without_a_limit_exception_class_is_not_used(
+    monkeypatch: pytest.MonkeyPatch, error: Any
+) -> None:
+    assert (
+        _reload(monkeypatch, _fake(replace={"NearDedupLimitError": error}), None).active() is None
+    )
+
+
+@pytest.mark.parametrize("name", _LIMITS)
+def test_a_core_with_another_limit_is_not_used(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+    assert (
+        _reload(monkeypatch, _fake(replace={name: getattr(_limits, name) + 1}), None).active()
+        is None
+    )
+    assert _reload(monkeypatch, _fake(replace={name: None}), None).active() is None
+    assert _reload(monkeypatch, _fake(), None).active() is not None
 
 
 def test_the_running_suite_is_on_the_backend_its_variable_asks_for() -> None:
@@ -107,12 +166,15 @@ def test_the_running_suite_is_on_the_backend_its_variable_asks_for() -> None:
     assert backend() == ("python" if pure else "rust")
 
 
-def test_a_core_with_another_api_number_is_not_used(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert _reload(monkeypatch, _fake(2), None).active() is None
+@pytest.mark.parametrize("api", [1, 3])
+def test_a_core_with_another_api_number_is_not_used(
+    monkeypatch: pytest.MonkeyPatch, api: int
+) -> None:
+    assert _reload(monkeypatch, _fake(api), None).active() is None
 
 
 def test_the_core_is_used_when_it_matches(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = _reload(monkeypatch, _fake(1), None)
+    module = _reload(monkeypatch, _fake(), None)
     assert module.active() is not None and module.backend() == "rust"
 
 
@@ -221,6 +283,73 @@ def test_compute_near_duplicates_comes_from_the_core(monkeypatch: pytest.MonkeyP
         pairs=[NearDuplicatePair(0, 1, 0.95)],
     )
     assert seen == [(["hello world", "hello world", "other"], 0.5)]
+
+
+def test_the_cores_limit_error_is_this_packages_with_the_same_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def near_duplicates(texts: list[str], threshold: float) -> Any:
+        raise _CoreLimitError("more than MAX_PAIRS (20000000) near-duplicate pairs")
+
+    _use(monkeypatch, near_duplicates=near_duplicates, NearDedupLimitError=_CoreLimitError)
+    with pytest.raises(NearDedupLimitError) as raised:
+        compute_near_duplicates([{"t": "a b c"}] * 2)
+    assert type(raised.value) is NearDedupLimitError
+    assert str(raised.value) == "more than MAX_PAIRS (20000000) near-duplicate pairs"
+
+
+def test_the_real_cores_limit_error_is_this_packages_with_the_same_words(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Against the actual binary, on whichever backend the suite runs. A batch over the pair
+    limit is refused by the core's counting walk before anything is allocated (about 0.6 s and
+    37 MB), so the limit path needs no 1.5 GB result."""
+    core = pytest.importorskip("dagnam_core.hygiene")
+    if not _backend._usable(core):
+        pytest.skip("the installed core is not one this release uses (e.g. no tables)")
+    with pytest.raises(NearDedupLimitError) as python:
+        near_dedup._check_pairs(MAX_PAIRS + 1)
+
+    monkeypatch.setattr(_backend, "active", lambda: core)
+    with pytest.raises(NearDedupLimitError) as compiled:
+        # n identical rows have n * (n - 1) / 2 pairs: 6,326 of them have 20,004,475.
+        compute_near_duplicates([{"t": "a b c"}] * 6326)
+    assert type(compiled.value) is NearDedupLimitError
+    assert str(compiled.value) == str(python.value)
+
+
+def test_an_error_of_the_core_that_is_not_its_limit_is_not_turned_into_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def near_duplicates(texts: list[str], threshold: float) -> Any:
+        raise RuntimeError("something else")
+
+    _use(monkeypatch, near_duplicates=near_duplicates, NearDedupLimitError=_CoreLimitError)
+    with pytest.raises(RuntimeError, match="something else"):
+        compute_near_duplicates([{"t": "a"}])
+
+
+def test_the_pairs_are_built_from_the_cores_tuples_one_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The result replaces the core's tuples in the list the core returned, so the two never
+    exist side by side (see the module docstring of `near_dedup`): same list object out, with
+    the pairs the tuples described, the one float object per similarity the core shares kept."""
+    similarity = 0.75
+    found: list[Any] = [(0, 1, similarity), (0, 2, similarity), (1, 2, 0.5)]
+    handed = found
+
+    _use(monkeypatch, near_duplicates=lambda texts, threshold: ([1, 2], found))
+    result = compute_near_duplicates([{"t": "a"}] * 3, 0.5)
+    assert result.pairs is handed
+    assert result.pairs == [
+        NearDuplicatePair(0, 1, 0.75),
+        NearDuplicatePair(0, 2, 0.75),
+        NearDuplicatePair(1, 2, 0.5),
+    ]
+    assert all(type(pair) is NearDuplicatePair for pair in result.pairs)
+    assert result.pairs[0].similarity is result.pairs[1].similarity
+    assert result.duplicate_indices == [1, 2] and result.kept_count == 1
 
 
 def test_compute_near_duplicates_never_hands_the_core_a_lone_surrogate(

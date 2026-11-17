@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
-## [Unreleased]
+## [0.7.0] - 2026-11-17
 
 ### Fixed
 
@@ -24,7 +24,8 @@ before 0.4.0 are described in `README.md`.
   (1.2 million fuzzed texts). At the level of the whole scan, 27 of 40,000 random texts
   change label: 26 of them from secret to email and still redacted, and one leaves a
   joiner and the next credential's name unredacted (no value characters). The compiled
-  core (`dagnam-core` 0.1.1) still has the old behaviour until it is updated to this release's reference.
+  core 0.2.0 has the same fix, and the differential test and the reference corpus hold both
+  to it.
 
 ### Added
 
@@ -45,21 +46,64 @@ before 0.4.0 are described in `README.md`.
     or all punctuation, and rows with no string values at all (a batch of numeric-only
     rows): they all compare as the same empty text.
 
-  The first checks come after the threshold and before any work, and before a compiled
-  core is called. The pair and comparison limits are enforced by the Python path; the
-  compiled core of this release (`dagnam-core` 0.1.1) reads the pair limit only when it has
-  returned (it has built every pair by then) and has no comparison limit, so on the compiled
-  backend only the first three hold. `dagnam-core` 0.2.0 is to enforce all five before it
-  allocates: this release must not ship with the `fast` extra at 0.1.1. On the Python path
-  the worst cases measured, on a laptop with other jobs running (CPython 3.14): one text of
-  `MAX_TEXT_CHARS` characters 7.9 s and 139 MB; a batch of `MAX_TOTAL_CHARS` characters
-  157 s and 218 MB; 10,000 rows that share a band and duplicate nothing, stopped at
-  `MAX_COMPARISONS` after 149 s and 116 MB; 50,000 identical rows, stopped at `MAX_PAIRS`
-  after 94 s at 1.81 GiB. A batch can reach several of them: at most about five minutes
-  and 2 GiB. All six names are exported from `dagnam_contracts` and
+  The first checks come after the threshold and before any work, and before the compiled
+  core is called; the core enforces the pair and comparison limits itself (see Changed).
+  On the Python path the worst cases measured, on a laptop with other jobs running
+  (CPython 3.14): one text of `MAX_TEXT_CHARS` characters 7.9 s and 139 MB; a batch of
+  `MAX_TOTAL_CHARS` characters 157 s and 218 MB; 10,000 rows that share a band and duplicate
+  nothing, stopped at `MAX_COMPARISONS` after 149 s and 116 MB; 50,000 identical rows,
+  stopped at `MAX_PAIRS` after 94 s at 1.81 GiB. A batch can reach several of them: at most
+  about five minutes and 2 GiB. All six names are exported from `dagnam_contracts` and
   `dagnam_contracts.hygiene`.
 
 ### Changed
+
+- **The compiled core is a default dependency.** `dagnam-contracts` now requires
+  `dagnam-core==0.2.0`, and the dataset-hygiene functions run on it unless it is off
+  (`DAGNAM_CONTRACTS_PURE`) or unusable. The pin is exact by design: a core release can
+  change a result without changing its binding contract, so every core release is a release
+  of this package. Every platform without a native wheel of the core (free-threaded 3.13,
+  PyPy, Windows on arm64, a glibc older than 2.17, ...) gets the core's stub wheel, which
+  reports the core unavailable, so `backend()` is `"python"` and the package's own Python
+  runs; nothing builds the core from source. `dagnam-contracts[fast]` stays as an alias with
+  the same pin, so installs that name it keep working.
+- **The core is used only when it matches this release.** `CORE_API` is 2; its character
+  tables must cover the interpreter (`UNICODE_SUPPORTED`: CPython 3.15, which is Unicode 17,
+  runs the Python); it must export the three functions and a `NearDedupLimitError`; and its
+  five near-duplicate limits must be this package's. Only an `ImportError` means "no core":
+  any other error while importing it is shown, not hidden.
+- **One exception type for a limit.** The core raises its own `NearDedupLimitError` for
+  `MAX_COMPARISONS` and `MAX_PAIRS` before it allocates what they bound; the call raises this
+  package's `NearDedupLimitError` instead, with the core's message (the same words). The pair
+  limit is no longer read after the core has returned.
+- **The compiled path no longer copies its result.** Each pair the core returns used to be
+  copied into a `NearDuplicatePair` beside the core's own list: 300 MB more at 3,000 identical
+  rows and 1.45 GB more at `MAX_PAIRS` (CPython 3.14). The core's tuples are now replaced by
+  their pairs in place, one at a time; the field names and types are unchanged. Peak resident
+  set in a fresh process through `compute_near_duplicates` (compiled against
+  `DAGNAM_CONTRACTS_PURE=1`, in MB): 3,000 identical texts, 365 against 381 on CPython 3.12,
+  366 against 383 on 3.13 and 437 against 383 on 3.14; exactly `MAX_PAIRS` pairs, 1,492
+  against 1,539 on 3.12 and 1,814 against 1,542 on 3.14. On 3.14 the compiled path peaks
+  above the Python one by the size of the core's own result (a 3-tuple is 72 bytes there, a
+  `NearDuplicatePair` 56), which is what the core alone peaks at, so it is the core's to
+  trim, not this package's: a compact result type is planned in `dagnam-core`. The worst case
+  stays under the documented bound of about 2 GiB, the compiled path is the faster one
+  (1.3 s against 19 s at 3,000 identical texts), and `DAGNAM_CONTRACTS_PURE=1` selects the
+  reference.
+- `dagnam` (the SDK) and the platform backend cap `dagnam-contracts` below 0.6, so they are
+  unaffected by this release until they lift the cap.
+- The core's tables follow the interpreter's Unicode version, so the differential test now
+  draws every code point (it used to leave out those assigned after Unicode 3.2) and ran at
+  50,000 examples on CPython 3.12, 3.13 and 3.14 with no difference. The two temporary
+  exceptions the 0.1.1 core needed (a corpus read on the Python reference, and a skipped
+  text in the differential) are gone: the suite reads the active backend everywhere.
+- A packaging test pins the promise: one unconditional `dagnam-core==<x>` default
+  dependency, the `fast` alias and the dev group at the same pin, that pin equal to the
+  version the lock resolves, and the built wheel's metadata.
+- CI installs the BUILT wheel into a clean environment with the core resolved from PyPI, on
+  Linux x86_64 and arm64, macOS arm64 and x86_64 and Windows x86_64 (CPython 3.12, 3.13 and
+  3.14), on free-threaded 3.14 (a native wheel), on free-threaded 3.13 (asserting the stub,
+  and that nothing was built) and on Alpine (musl), each making one real call.
 
 - **Near-duplicate detection no longer holds the pairs three times.** The candidate pairs
   are streamed in sorted order from a pointer per row and band instead of being built as
@@ -76,6 +120,12 @@ before 0.4.0 are described in `README.md`.
   same). `tests/hygiene/test_repo_credential_free.py` reads every tracked text file with
   the package's own finder and three marker scans and fails with `file:line` when one
   holds such text.
+
+### Removed
+
+- The documented Unicode divergence between the core and the interpreter (CJK Extension I on
+  Python 3.12, the Unicode 16 letters and digits on Python 3.14): the core's tables now follow
+  the interpreter, and an interpreter they do not cover runs the Python.
 
 ## [0.6.0] - 2026-11-17
 

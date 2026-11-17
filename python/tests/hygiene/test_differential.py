@@ -10,35 +10,33 @@ on which one is active.
 from __future__ import annotations
 
 from collections import Counter
+import os
 import unicodedata
 
 from dagnam_core import hygiene as core
-from hypothesis import assume, given, settings, strategies as st
+from hypothesis import given, settings, strategies as st
 from pii_corpus import SAMPLES
 import pytest
-from test_credentials_flat import bare_walk_before_r1
-from test_credentials_refused import _LONG, _PW_NAME, _WITH_DIGITS
 
-from dagnam_contracts.hygiene import _backend, credentials, near_dedup, spans
+from dagnam_contracts.hygiene import _backend, near_dedup, spans
 
 _PIECES = st.sampled_from(sorted({s for group in SAMPLES.values() for s in group}))
 
 
-# Arbitrary UTF-8 between the pieces: every code point that Unicode 3.2 assigned and whose
-# general category has not changed since. That keeps the scripts, digits, combining marks,
-# space separators and mathematical letters, and leaves out the characters that the core's
-# tables (Unicode 15.1) and the interpreter's own may classify differently: those assigned
-# in a later version, which is a difference of data tables, not of code, and would make this
-# test depend on the interpreter it runs on (see the README).
-def _stable(char: str) -> bool:
-    return unicodedata.ucd_3_2_0.category(char) == unicodedata.category(char) != "Cn"
+# `DAGNAM_DIFFERENTIAL_EXAMPLES` widens the run (50,000 for the check before a release).
+_EXAMPLES = int(os.environ.get("DAGNAM_DIFFERENTIAL_EXAMPLES", "2000"))
 
-
+# Arbitrary UTF-8 between the pieces: every code point there is, assigned or not. The core's
+# tables are those of the interpreter's own Unicode version (`UNICODE_SUPPORTED` is checked
+# before the core is used), so the two classify every character alike, and the run holds on
+# every interpreter the core supports.
+#
 # The characters a hand-written `\w`, `\d` or `\s` gets wrong next to a span, drawn from
-# ranges and filtered by the same rule (never typed as literals): combining marks, decimal
-# digits of every script, Arabic and Devanagari letters, the fullwidth forms, the space
-# separators and the right-to-left controls. Hypothesis draws non-ASCII text mostly from
-# Latin-1, so without these a run of 2000 examples holds almost none of them.
+# ranges (never typed as literals): combining marks, decimal digits of every script, Arabic and
+# Devanagari letters, the fullwidth forms, the space separators and the right-to-left controls;
+# then the scripts Unicode added after 3.2 and after 15.0 (CJK Extension I, Egyptian
+# hieroglyphs extended-A, Ol Onal), which a draw reaches only now and then. Hypothesis draws
+# non-ASCII text mostly from Latin-1, so without these a run of 2000 examples holds almost none.
 _TRAPS = [
     char
     for low, high in [
@@ -53,12 +51,14 @@ _TRAPS = [
         (0x3000, 0x3000),
         (0xFF01, 0xFF5E),
         (0x1D7CE, 0x1D7FF),
+        (0x13460, 0x143FA),
+        (0x1E5D0, 0x1E5FF),
+        (0x2EBF0, 0x2EE5D),
     ]
     for char in map(chr, range(low, high + 1))
-    if _stable(char)
 ]
 _GLUE_CHARS = st.one_of(
-    st.characters(codec="utf-8").filter(_stable),
+    st.characters(codec="utf-8"),
     st.sampled_from(_TRAPS),
 )
 _GLUE = st.text(alphabet=_GLUE_CHARS, max_size=12)
@@ -74,45 +74,25 @@ _THRESHOLDS = st.sampled_from([0.1, 0.5, 0.75, 0.9, 1.0])
 def test_the_alphabet_holds_the_characters_a_hand_ported_class_gets_wrong() -> None:
     for char in ["\u0301", "\u0663", "\u0915", "\u0967", "\uff11", "\u200f", "\u202e", "\u3000"]:
         assert char in _TRAPS, hex(ord(char))
-    assert all(_stable(char) for char in _TRAPS)
     assert {unicodedata.category(char) for char in _TRAPS} >= {"Mn", "Nd", "Lo", "Zs", "Cf"}
 
 
-def _reference_spans(text: str, *, before_r1: bool = False) -> list[tuple[int, int, str]]:
-    """The spans of the Python reference; with ``before_r1`` its bare-value walk is the one
-    it had before an assignment inside a refused value was found (`test_credentials_refused`)."""
+def _reference_spans(text: str) -> list[tuple[int, int, str]]:
+    """The spans of the Python reference, whichever backend is active."""
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(_backend, "active", lambda: None)
-        if before_r1:
-            patch.setattr(credentials, "_bare_assignments", bare_walk_before_r1)
         return [(s, e, d.code) for s, e, d in spans.findings(text)]
 
 
-@settings(max_examples=2000, deadline=None)
+@settings(max_examples=_EXAMPLES, deadline=None)
 @given(_TEXTS)
 def test_the_core_and_the_reference_find_the_same_spans(text: str) -> None:
-    reference = _reference_spans(text)
-    # The core of this release's pin has not learned the R1 fix: a text on which the reference
-    # now reads differently is the one place they are meant to differ, until the pin moves
-    # (the reference corpus holds those texts, and the core's own gate holds it to them).
-    assume(reference == _reference_spans(text, before_r1=True))
-    assert [tuple(span) for span in core.findings(text)] == reference
+    assert [tuple(span) for span in core.findings(text)] == _reference_spans(text)
 
 
-def test_the_pinned_core_has_not_learned_the_r1_fix_yet() -> None:
-    """The canary for two temporary adjustments: the ``assume`` above, and the reference-only
-    read of the texts the R1 fix changes in `test_corpus_credentials.py` (`_spans`).
-
-    `dagnam-core` 0.1.1 binds ``CORE_API`` 1 and reads a value an ambiguous name refuses
-    whole, so a password after it is missed. The day the pin moves to a core that has the
-    fix (0.2.0), this fails: delete the ``assume``, the ``before_r1`` argument of
-    `_reference_spans`, the reference-only branch of `_spans`, and this test, so that the
-    core is held to the reference on every text again.
-    """
-    text = f"token={_LONG}?{_PW_NAME}={_WITH_DIGITS}"
-    assert core.CORE_API == 1
-    assert [tuple(span) for span in core.findings(text)] == _reference_spans(text, before_r1=True)
-    assert _reference_spans(text) != _reference_spans(text, before_r1=True)
+def test_the_core_binds_the_contract_this_release_was_written_against() -> None:
+    assert core.CORE_API == _backend.CORE_API
+    assert core.UNICODE_SUPPORTED
 
 
 def _chain(*parts: tuple[str, int, str]) -> str:
@@ -143,7 +123,7 @@ def test_the_core_and_the_reference_agree_on_a_chain_of_hidden_findings(text: st
     assert [tuple(span) for span in core.findings(text)] == reference
 
 
-@settings(max_examples=500, deadline=None)
+@settings(max_examples=_EXAMPLES // 4, deadline=None)
 @given(_ROW_TEXTS)
 def test_the_core_and_the_reference_sign_the_same_shingles(text: str) -> None:
     shingle_set = near_dedup.shingles(text)
@@ -153,7 +133,7 @@ def test_the_core_and_the_reference_sign_the_same_shingles(text: str) -> None:
     assert tuple(core.minhash_signature(list(shingle_set))) == reference
 
 
-@settings(max_examples=500, deadline=None)
+@settings(max_examples=_EXAMPLES // 4, deadline=None)
 @given(st.lists(_ROW_TEXTS, max_size=10), _THRESHOLDS)
 def test_the_core_and_the_reference_find_the_same_near_duplicates(
     texts: list[str], threshold: float
