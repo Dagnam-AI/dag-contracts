@@ -21,6 +21,28 @@ before 0.4.0 are described in `README.md`.
   itself is still taken whole. The compiled core (`dagnam-core`) still has the old
   behaviour until it is updated to this release's reference.
 
+### Added
+
+- **Limits on a near-duplicate batch.** `compute_near_duplicates` raises the new
+  `NearDedupLimitError` (a `ValueError`) for more than `MAX_TEXTS` (50,000) rows, a
+  comparison text of more than `MAX_TEXT_CHARS` (1,000,000) characters, more than
+  `MAX_TOTAL_CHARS` (64,000,000) characters in all, and a result of more than `MAX_PAIRS`
+  (10,000,000) pairs. The first three are checked before any text is shingled, after the
+  threshold; the last stops the walk at the pair past it. The message names the limit and
+  its value and never holds a word of the rows. Worst case measured at about 1.5 GB
+  resident (1.24 GB at the pair limit with 50,000 identical rows). All five names are
+  exported from `dagnam_contracts` and `dagnam_contracts.hygiene`.
+
+### Changed
+
+- **Near-duplicate detection no longer holds the pairs three times.** The candidate pairs
+  are streamed in sorted order from a pointer per row and band instead of being built as
+  a set, sorted into a list and then verified into a third. 3,000 identical rows: 1.08 GB
+  and 39 s before, 0.38 GB and 20 s now; the result (duplicate indices, pairs and their
+  order, similarities) is unchanged. The memory that remains is the result itself, which
+  lists every pair of identical rows (about 80 bytes a pair): it still grows with the
+  square of the identical rows, and `MAX_PAIRS` bounds it.
+
 ## [0.6.0] - 2026-11-17
 
 ### Added

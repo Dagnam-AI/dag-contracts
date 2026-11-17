@@ -119,7 +119,10 @@ def find_band_misses(generator: random.Random, wanted: int) -> list[tuple[str, s
         left = _base(generator)
         right = _mutate(left, generator.randint(4, 12), generator)
         signatures = [_signature(left), _signature(right)]
-        if estimate_jaccard(*signatures) >= 0.5 and not _candidate_pairs(signatures):
+        if (
+            estimate_jaccard(*signatures) >= 0.5
+            and next(_candidate_pairs(signatures), None) is None
+        ):
             found.append((left, right))
             if len(found) == wanted:
                 break

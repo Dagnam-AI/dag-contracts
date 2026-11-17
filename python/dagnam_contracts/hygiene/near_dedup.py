@@ -32,14 +32,29 @@ Design, and why each piece is what it is:
   asymmetry is what makes the operation idempotent: re-running over the kept
   rows finds nothing further.
 
+* **A batch has limits, because the rows are not the caller's.** `compute_near_duplicates`
+  raises `NearDedupLimitError` (a `ValueError`) for more than `MAX_TEXTS` rows, a
+  comparison text (what `row_text` returns) of more than `MAX_TEXT_CHARS` characters, more
+  than `MAX_TOTAL_CHARS` in all -- each before anything is shingled or hashed, and after
+  the threshold check -- and for a result of more than `MAX_PAIRS` pairs, as soon as the
+  walk finds the one past it. The message names the limit and its value and holds no text.
+* **What it holds, measured** (CPython 3.14, reference backend, peak resident set). The
+  rows' signatures and band pointers cost about 8 KB a row: 50,000 distinct short rows
+  took 0.47 GB in 11 s. A text of `MAX_TEXT_CHARS` characters takes 1.4 s and about 15 MB
+  beyond itself to shingle. The result lists *every* verified pair, so n identical rows
+  hold n * (n - 1) / 2 pairs at about 80 bytes each: 3,000 took 0.38 GB in 20 s (1.08 GB in
+  39 s before the candidate pairs were streamed), and 50,000 identical rows reach
+  `MAX_PAIRS` after 54 s at 1.24 GB. Add the largest batch of texts (`MAX_TOTAL_CHARS`,
+  up to four bytes a character, 0.26 GB) and the worst case is about 1.5 GB, under 2 GiB.
+
 Pure — no session, no I/O.
 """
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from dataclasses import dataclass, field
 import hashlib
-from itertools import combinations
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -74,6 +89,32 @@ DEFAULT_THRESHOLD = 0.9
 """Conservative by intent. Near-dedup deletes training signal when it is wrong,
 so the default only merges rows that are almost the same text; a caller that
 knows its task tolerates more passes a lower number explicitly."""
+
+MAX_TEXTS = 50_000
+"""The most rows `compute_near_duplicates` takes: more raises `NearDedupLimitError`."""
+
+MAX_TEXT_CHARS = 1_000_000
+"""The most characters in one row's comparison text (what `row_text` returns)."""
+
+MAX_TOTAL_CHARS = 64_000_000
+"""The most characters in all the comparison texts together."""
+
+MAX_PAIRS = 10_000_000
+"""The most verified pairs `compute_near_duplicates` returns.
+
+The result lists every pair of rows judged near-duplicates, so a batch of n identical
+rows has n * (n - 1) / 2 of them; past this many the call raises `NearDedupLimitError`.
+"""
+
+
+class NearDedupLimitError(ValueError):
+    """A batch is larger than `compute_near_duplicates` takes (`MAX_TEXTS`, `MAX_TEXT_CHARS`,
+    `MAX_TOTAL_CHARS` or `MAX_PAIRS`).
+
+    The message names the limit and its value and carries no row text, so it can be logged
+    and shown to the sender of the batch.
+    """
+
 
 _MASK64 = (1 << 64) - 1
 _MERSENNE_PRIME = (1 << 61) - 1
@@ -179,19 +220,62 @@ def estimate_jaccard(left: tuple[int, ...], right: tuple[int, ...]) -> float:
     return matches / len(left)
 
 
-def _candidate_pairs(signatures: list[tuple[int, ...]]) -> set[tuple[int, int]]:
-    """Index pairs sharing at least one LSH band."""
+def _candidate_pairs(signatures: list[tuple[int, ...]]) -> Iterator[tuple[int, int]]:
+    """Index pairs sharing at least one LSH band, each once, in sorted order.
+
+    Never holds the pairs: rows that share a band's bucket are one list, a row points at
+    the list it is in, and the pairs of a row ``left`` are the later members of its buckets,
+    merged and sorted a row at a time. A set of all the pairs, which this used to build,
+    holds the square of the number of identical texts.
+    """
     rows_per_band = NUM_PERMUTATIONS // BANDS
-    candidates: set[tuple[int, int]] = set()
+    bucket_of: list[list[list[int] | None]] = []  # per band, per row: its bucket, if shared
     for band in range(BANDS):
         start = band * rows_per_band
         buckets: dict[tuple[int, ...], list[int]] = {}
         for index, signature in enumerate(signatures):
             buckets.setdefault(signature[start : start + rows_per_band], []).append(index)
+        owner: list[list[int] | None] = [None] * len(signatures)
         for members in buckets.values():
             if len(members) > 1:
-                candidates.update(combinations(members, 2))
-    return candidates
+                for index in members:
+                    owner[index] = members
+        bucket_of.append(owner)
+    for left in range(len(signatures)):
+        later: set[int] = set()
+        for owner in bucket_of:
+            members = owner[left]
+            if members is not None:
+                later.update(members[bisect_right(members, left) :])
+        for right in sorted(later):
+            yield left, right
+
+
+def _comparison_texts(rows: list[dict[str, Any]]) -> list[str]:
+    """``row_text`` of every row, after the limits on the batch (the rows are read one at a
+    time, and the first row over a limit ends the read: nothing is shingled before that)."""
+    if len(rows) > MAX_TEXTS:
+        raise NearDedupLimitError(f"{len(rows)} texts is more than MAX_TEXTS ({MAX_TEXTS})")
+    texts: list[str] = []
+    total = 0
+    for row in rows:
+        text = row_text(row)
+        if len(text) > MAX_TEXT_CHARS:
+            raise NearDedupLimitError(
+                f"a text of {len(text)} characters is more than MAX_TEXT_CHARS ({MAX_TEXT_CHARS})"
+            )
+        total += len(text)
+        if total > MAX_TOTAL_CHARS:
+            raise NearDedupLimitError(
+                f"the texts hold more than MAX_TOTAL_CHARS ({MAX_TOTAL_CHARS}) characters"
+            )
+        texts.append(text)
+    return texts
+
+
+def _check_pairs(count: int) -> None:
+    if count > MAX_PAIRS:
+        raise NearDedupLimitError(f"more than MAX_PAIRS ({MAX_PAIRS}) near-duplicate pairs")
 
 
 def compute_near_duplicates(
@@ -209,13 +293,13 @@ def compute_near_duplicates(
     """
     if not 0 < threshold <= 1:
         raise ValueError(f"threshold must be in (0, 1]; got {threshold}")
-
-    texts = [row_text(row) for row in rows]
+    texts = _comparison_texts(rows)
     core = _backend.active() if type(threshold) in (float, int) else None
     # `row_text` turns every character that is not a word character or whitespace, a lone
     # surrogate included, into a space, so the core always receives UTF-8 here.
     if core is not None:
         duplicates, found = core.near_duplicates(texts, threshold)
+        _check_pairs(len(found))
         return NearDedupResult(
             threshold=threshold,
             duplicate_indices=list(duplicates),
@@ -226,9 +310,9 @@ def compute_near_duplicates(
 
     signatures = [minhash_signature(shingles(text)) for text in texts]
 
-    # Sorted so the union-find below runs in a fixed order: a row that is
-    # near-duplicate of two others that are not near-duplicates of each other
-    # would otherwise be attached to whichever pair set iteration reached
+    # Sorted (`_candidate_pairs` yields them so) so the union-find below runs in a fixed
+    # order: a row that is near-duplicate of two others that are not near-duplicates of
+    # each other would otherwise be attached to whichever pair set iteration reached
     # first, and the reported `kept_index` would move between runs.
     pairs: list[NearDuplicatePair] = []
     parent = list(range(len(rows)))
@@ -239,13 +323,19 @@ def compute_near_duplicates(
             index = parent[index]
         return index
 
-    for left, right in sorted(_candidate_pairs(signatures)):
+    seen: dict[float, float] = {}  # one float object per similarity, not one per pair
+    for left, right in _candidate_pairs(signatures):
         similarity = estimate_jaccard(signatures[left], signatures[right])
         if similarity < threshold:
             continue
         pairs.append(
-            NearDuplicatePair(kept_index=left, duplicate_index=right, similarity=similarity)
+            NearDuplicatePair(
+                kept_index=left,
+                duplicate_index=right,
+                similarity=seen.setdefault(similarity, similarity),
+            )
         )
+        _check_pairs(len(pairs))
         root_left, root_right = _find(left), _find(right)
         if root_left != root_right:
             # Always attach the higher root to the lower one, so a cluster's
@@ -266,8 +356,13 @@ def compute_near_duplicates(
 __all__ = [
     "BANDS",
     "DEFAULT_THRESHOLD",
+    "MAX_PAIRS",
+    "MAX_TEXTS",
+    "MAX_TEXT_CHARS",
+    "MAX_TOTAL_CHARS",
     "NUM_PERMUTATIONS",
     "SHINGLE_SIZE",
+    "NearDedupLimitError",
     "NearDedupResult",
     "NearDuplicatePair",
     "compute_near_duplicates",

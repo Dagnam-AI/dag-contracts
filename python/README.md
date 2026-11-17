@@ -156,9 +156,12 @@ only way the core arrives.
 Contributing: the development environment installs the core, so it needs a platform with
 a wheel (or a Rust toolchain).
 
-Known limit: near-duplicate detection compares every pair of rows whose normalised text
-is identical, so its memory grows with the square of the number of identical texts. A
-dataset in which a very large share of the rows is one repeated text should go through
+Known limit: the near-duplicate result lists every pair of rows judged near-duplicates,
+so its memory grows with the square of the number of identical normalised texts (about 80
+bytes a pair). `compute_near_duplicates` raises `NearDedupLimitError` for a batch of more
+than `MAX_TEXTS` rows, a text over `MAX_TEXT_CHARS` characters, more than
+`MAX_TOTAL_CHARS` characters in all, or a result over `MAX_PAIRS` pairs. A dataset in
+which a very large share of the rows is one repeated text should go through
 `compute_exact_duplicates` first.
 
 ## Versioning
