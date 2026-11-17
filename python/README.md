@@ -102,59 +102,66 @@ about a later scan of the row.
 UK NINOs, Canadian SINs, Indian Aadhaar and PAN numbers and EU VAT numbers,
 each checksum-, parser-, format- or keyword-backed and under its own code.
 
-## A compiled backend, opt-in
+## The compiled core
 
 ```sh
-pip install "dagnam-contracts[fast]"
+pip install dagnam-contracts
 ```
 
-The `fast` extra installs [`dagnam-core`](https://pypi.org/project/dagnam-core/), a
+Installing the package installs [`dagnam-core`](https://pypi.org/project/dagnam-core/), a
 compiled implementation of the hygiene hot paths: the PII scan (`scan_rows`,
 `redact_rows`, `apply_pii_policy`) and near-duplicate detection
-(`compute_near_duplicates`, `minhash_signature`). Each release of this package names
-the one core version it was tested against (`dagnam-core==0.1.1` for 0.6.0).
+(`compute_near_duplicates`, `minhash_signature`). It is the one dependency of this package,
+and it is used by default. (`dagnam-contracts[fast]`, which 0.6.0 documented, still works:
+it is an alias of the default install.)
 
 ```python
 from dagnam_contracts.hygiene import backend
 
-backend()  # "rust" when the compiled core is installed and in use, otherwise "python"
+backend()  # "rust" when the compiled core is in use, otherwise "python"
 ```
 
 **The Python stays the reference.** A differential test runs both over the same inputs,
-and the reference corpus the core is checked against is always computed by the Python,
-whatever is installed. The core returns what the Python returns, with one documented
-exception. Its tables of letters, digits and whitespace come from Unicode 15.1, while the
-Python uses the tables of the interpreter it runs on, so on the few characters first
-assigned in another Unicode version the core's answer can differ from the interpreter's
-own: the CJK Extension I ideographs (U+2EBF0 to U+2EE5D) on Python 3.12 (Unicode 15.0),
-and the letters and digits added in Unicode 16 on Python 3.14. On Python 3.13 the two
-agree. A finding that touches such a character can have a different extent, or be
-reported by one backend only: `jane@example.com` followed by U+13460 is a finding of 16
-characters on the core and of 17 on Python 3.14. Near-duplicate detection is not
-affected, because its text is normalised in Python before the core reads it. The full
-list is in [dag-core's divergences](https://github.com/Dagnam-AI/dag-core/blob/main/docs/divergences.md).
+on every interpreter the core supports, and the reference corpus the core is checked
+against is always computed by the Python, whatever is installed. The core returns what the
+Python returns: its tables of letters, digits and whitespace follow the Unicode version of
+the interpreter it runs on (15.0, 15.1 or 16.0), so the two classify every character alike.
+An interpreter whose Unicode version the core has no tables for (`UNICODE_SUPPORTED` is
+false: Python 3.15 and later, until the core learns it) does not use the core at all and
+runs the Python, so the answer is still the same. That is also why a result never depends
+on which backend ran.
 
-The core is used when it is installed, its binding contract is the one this release was
-written against, and it exports the functions this package calls; otherwise the Python
-runs, without a message. Set `DAGNAM_CONTRACTS_PURE` to force the Python everywhere (to
-compare the two, or to rule the core out while debugging). It is read once, when
-`dagnam_contracts` is first imported, so set it before the import: unset, empty, `0`,
-`false`, `no` and `off` (any case) leave the core on, and any other value turns it off.
+**What runs where.** Every platform gets a wheel of `dagnam-core`. Where the core has a
+native wheel (Linux x86_64 and arm64, glibc and musl; macOS x86_64 and arm64; Windows
+x86_64; CPython 3.12 or later and the free-threaded 3.14) it is the compiled core. On
+any other platform or interpreter (free-threaded 3.13, PyPy, Windows on arm64, a glibc older
+than 2.17, ...) pip and uv install the core's *stub* wheel instead of building the source
+package, so no install ever needs a Rust toolchain: the stub reports the core unavailable
+(importing its `hygiene` raises `ImportError`), `backend()` is `"python"`, and this
+package's Python runs, without a message. A pip user who names a newer target with
+`pip install --platform ...` should read the sentence about `manylinux2014` in
+[dag-core's README](https://github.com/Dagnam-AI/dag-core/blob/main/README.md), or pip finds
+no native wheel and takes the stub.
+
+**The pin is exact, by design.** This package requires `dagnam-core==<one version>`
+(0.2.0 for 0.7.0): a core release can change a result without changing its binding
+contract, so the contract must match the core's behaviour exactly, and every core release is
+a release of this package. The core is used only when its binding contract (`CORE_API`) is the
+one this release was written against, its character tables cover the interpreter,
+it exports the functions this package calls, and its five near-duplicate limits are this
+package's; otherwise the Python runs, whatever is installed.
+
+Set `DAGNAM_CONTRACTS_PURE` to force the Python everywhere (to compare the two, or to rule
+the core out while debugging). It is read once, when `dagnam_contracts` is first imported,
+so set it before the import: unset, empty, `0`, `false`, `no` and `off` (any case) leave the
+core on, and any other value turns it off.
 `compute_near_duplicates` reads its threshold in the core as a 64-bit float, so it hands
 the core only a threshold that is exactly a `float` or an `int`; a `Decimal`, a
 `Fraction` or a `bool` is compared exactly, in Python.
 
-`[fast]` installs the core from a wheel on Linux (x86_64 and aarch64, glibc 2.28 or
-later, and musl), macOS (x86_64 and arm64) and Windows (x86_64), for CPython 3.12 or
-later, and for the free-threaded 3.14. Anywhere else (free-threaded 3.13, PyPy, older
-glibc, Windows on arm64) there is no wheel, and pip falls back to the source package,
-which needs Rust 1.99 or later: it compiles for minutes, the build tool downloads a Rust
-toolchain itself when none is installed, and it fails offline or with an older Rust.
-There, install plain `dagnam-contracts`: `dependencies` stays empty, and the extra is the
-only way the core arrives.
-
-Contributing: the development environment installs the core, so it needs a platform with
-a wheel (or a Rust toolchain).
+Contributing: the development environment installs the core, which has a wheel (or the stub)
+on every platform, so `uv sync` needs nothing more. `uv run poe check` runs the suite on both
+backends.
 
 Known limit: the near-duplicate result lists every pair of rows judged near-duplicates,
 so its memory grows with the square of the number of identical normalised texts (about 70
@@ -165,7 +172,8 @@ of string values, more than `MAX_TOTAL_CHARS` (20,000,000) in all, more than
 `MAX_PAIRS` (20,000,000) pairs: about 6,300 rows with the same normalised text (rows with
 no string values, or only punctuation, are one empty text). The first three are checked
 before any work and before the compiled core is called; the last two are enforced by the
-Python path, and by the core from `dagnam-core` 0.2.0. A dataset in which a very large
+Python path, and by the core before it allocates, which raises the same
+`NearDedupLimitError` with the same message. A dataset in which a very large
 share of the rows is one repeated text should go through `compute_exact_duplicates` first.
 
 ## Versioning
