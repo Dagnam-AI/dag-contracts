@@ -111,8 +111,8 @@ pip install "dagnam-contracts[fast]"
 The `fast` extra installs [`dagnam-core`](https://pypi.org/project/dagnam-core/), a
 compiled implementation of the hygiene hot paths: the PII scan (`scan_rows`,
 `redact_rows`, `apply_pii_policy`) and near-duplicate detection
-(`compute_near_duplicates`, `minhash_signature`). It returns exactly what the Python
-returns, which stays the reference: a differential test runs both over the same inputs.
+(`compute_near_duplicates`, `minhash_signature`). Each release of this package names
+the one core version it was tested against (`dagnam-core==0.1.1` for 0.6.0).
 
 ```python
 from dagnam_contracts.hygiene import backend
@@ -120,13 +120,39 @@ from dagnam_contracts.hygiene import backend
 backend()  # "rust" when the compiled core is installed and in use, otherwise "python"
 ```
 
-The core is used when it is installed and its binding contract matches the one this
-release was written against; otherwise the Python runs, silently. Set
-`DAGNAM_CONTRACTS_PURE=1` to force the Python everywhere (to compare the two, or to rule
-the core out while debugging). Wheels exist for Linux x86_64 and aarch64 (glibc and
-musl), macOS x86_64 and arm64, and Windows x86_64, on CPython 3.12 and later including
-the free-threaded 3.14t; anywhere else the package installs without the core and runs
-the Python. `dependencies` stays empty: the extra is the only way the core arrives.
+**The Python stays the reference.** A differential test runs both over the same inputs,
+and the reference corpus the core is checked against is always computed by the Python,
+whatever is installed. The core returns what the Python returns, with one documented
+exception. Its tables of letters, digits and whitespace come from Unicode 15.1, while the
+Python uses the tables of the interpreter it runs on, so on the few characters first
+assigned in another Unicode version the core's answer can differ from the interpreter's
+own: the CJK Extension I ideographs (U+2EBF0 to U+2EE5D) on Python 3.12 (Unicode 15.0),
+and the letters and digits added in Unicode 16 on Python 3.14. On Python 3.13 the two
+agree. A finding that touches such a character can have a different extent, or be
+reported by one backend only: `jane@example.com` followed by U+13460 is a finding of 16
+characters on the core and of 17 on Python 3.14. Near-duplicate detection is not
+affected, because its text is normalised in Python before the core reads it. The full
+list is in [dag-core's divergences](https://github.com/Dagnam-AI/dag-core/blob/main/docs/divergences.md).
+
+The core is used when it is installed, its binding contract is the one this release was
+written against, and it exports the functions this package calls; otherwise the Python
+runs, without a message. Set `DAGNAM_CONTRACTS_PURE` to force the Python everywhere (to
+compare the two, or to rule the core out while debugging). It is read once, when
+`dagnam_contracts` is first imported, so set it before the import: unset, empty, `0`,
+`false`, `no` and `off` (any case) leave the core on, and any other value turns it off.
+`compute_near_duplicates` reads its threshold in the core as a 64-bit float, so it hands
+the core only a threshold that is exactly a `float` or an `int`; a `Decimal`, a
+`Fraction` or a `bool` is compared exactly, in Python.
+
+`[fast]` installs the core from a wheel on Linux (x86_64 and aarch64, glibc 2.28 or
+later, and musl), macOS and Windows (x86_64), for CPython 3.12 or later, and for the
+free-threaded 3.14. Anywhere else (free-threaded 3.13, PyPy, older glibc, Windows on
+arm64) there is no wheel, and pip falls back to the source package, which needs a Rust
+toolchain (1.99 or later) and fails without one. There, install plain `dagnam-contracts`:
+`dependencies` stays empty, and the extra is the only way the core arrives.
+
+Contributing: the development environment installs the core, so it needs a platform with
+a wheel (or a Rust toolchain).
 
 Known limit: near-duplicate detection compares every pair of rows whose normalised text
 is identical, so its memory grows with the square of the number of identical texts. A

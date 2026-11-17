@@ -202,12 +202,16 @@ def compute_near_duplicates(
     Raises `ValueError` for a threshold outside ``(0, 1]``: 0 would merge
     every row in the dataset into one cluster, which is never what a caller
     meant to ask for.
+
+    The compiled core is used only for a threshold that is exactly a ``float`` or an
+    ``int``: it reads the threshold as a 64-bit float, so a ``Decimal``, a ``Fraction``, a
+    ``bool`` or a subclass of ``float`` takes the Python, whose comparison is exact.
     """
     if not 0 < threshold <= 1:
         raise ValueError(f"threshold must be in (0, 1]; got {threshold}")
 
     texts = [row_text(row) for row in rows]
-    core = _backend.active()
+    core = _backend.active() if type(threshold) in (float, int) else None
     # `row_text` turns every character that is not a word character or whitespace, a lone
     # surrogate included, into a space, so the core always receives UTF-8 here.
     if core is not None:

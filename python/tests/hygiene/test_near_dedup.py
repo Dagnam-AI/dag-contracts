@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 import random
-from unittest import mock
 
 from hypothesis import given, settings as hyp_settings, strategies as st
 import pytest
@@ -33,7 +32,7 @@ def _python_reference() -> Iterator[None]:
     """These tests pin the Python reference, so it runs even when the compiled core is
     installed (`test_differential.py` ties the two together). Module-scoped, and holding no
     other fixture, so Hypothesis's function-scoped-fixture check has nothing to refuse."""
-    with mock.patch.object(_backend, "active", lambda: None):
+    with _backend.reference():
         yield
 
 

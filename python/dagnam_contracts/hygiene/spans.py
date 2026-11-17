@@ -175,8 +175,10 @@ def findings(text: str, stats: Counter[str] | None = None) -> list[Span]:
         try:
             raw = core.findings(text)
         except UnicodeEncodeError:
-            pass  # not UTF-8 (a lone surrogate): the Python below reads it
-        else:
+            raw = None  # not UTF-8 (a lone surrogate): the Python below reads it
+        # A code this release does not know is a core this release was not written for:
+        # the Python decides, rather than a KeyError in the middle of a redaction.
+        if raw is not None and all(code in _BY_CODE for _, _, code in raw):
             return [(start, end, _BY_CODE[code]) for start, end, code in raw]
     counts: Counter[str] = Counter() if stats is None else stats
     out: list[Span] = []

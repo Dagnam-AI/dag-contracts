@@ -25,7 +25,9 @@ dependencies = []
 [project.optional-dependencies]
 # The compiled backend for the hygiene functions (`dagnam-core`). Optional on purpose: the
 # Python in this package is the reference and runs wherever the compiled one has no wheel.
-fast = ["dagnam-core>=0.1.1,<0.2"]
+# Exactly the core this release was tested against: a core release can change a result
+# without changing its binding contract, so each contracts release names its core.
+fast = ["dagnam-core==0.1.1"]
 
 [project.urls]
 Homepage = "https://github.com/Dagnam-AI/dag-contracts"
@@ -33,7 +35,7 @@ Source = "https://github.com/Dagnam-AI/dag-contracts"
 
 [dependency-groups]
 dev = [
-    "dagnam-core>=0.1.1,<0.2",
+    "dagnam-core==0.1.1",
     "hypothesis",
     "poethepoet>=0.46.0",
     "pyright",

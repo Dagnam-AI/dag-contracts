@@ -10,6 +10,7 @@ on which one is active.
 from __future__ import annotations
 
 from collections import Counter
+import unicodedata
 
 from dagnam_core import hygiene as core
 from hypothesis import given, settings, strategies as st
@@ -19,28 +20,21 @@ import pytest
 from dagnam_contracts.hygiene import _backend, near_dedup, spans
 
 _PIECES = st.sampled_from(sorted({s for group in SAMPLES.values() for s in group}))
-# Arbitrary UTF-8 between the pieces, from blocks whose letters and digits every Unicode
-# version agrees on (Latin, Greek, Cyrillic, punctuation, CJK ideographs, Hangul syllables) plus
-# emoji, which are astral and not word characters. A character a later Unicode version
-# adds (a letter in Python 3.14, not yet one in the core's tables) is a difference of
-# data tables, not of code, and would make this test depend on the interpreter's version.
-_GLUE_CHARS = st.one_of(
-    *(
-        st.characters(min_codepoint=low, max_codepoint=high, codec="utf-8")
-        for low, high in [
-            (0x00, 0x24F),
-            (0x370, 0x52F),
-            (0x2000, 0x206F),
-            (0x4E00, 0x9FA5),
-            (0xAC00, 0xD7A3),
-            (0x1F300, 0x1F64F),
-        ]
-    )
+# Arbitrary UTF-8 between the pieces: every code point that Unicode 3.2 assigned and whose
+# general category has not changed since. That keeps the scripts, digits, combining marks,
+# space separators and mathematical letters, and leaves out the characters that the core's
+# tables (Unicode 15.1) and the interpreter's own may classify differently: those assigned
+# in a later version, which is a difference of data tables, not of code, and would make this
+# test depend on the interpreter it runs on (see the README).
+_GLUE_CHARS = st.characters(codec="utf-8").filter(
+    lambda c: unicodedata.ucd_3_2_0.category(c) == unicodedata.category(c) != "Cn"
 )
 _GLUE = st.text(alphabet=_GLUE_CHARS, max_size=12)
 _TEXTS = st.lists(st.one_of(_PIECES, _GLUE), max_size=12).map("".join)
 
-_WORDS = st.sampled_from(["alpha", "beta", "gamma", "delta", "eps", "zeta", "eta", "theta"])
+_WORDS = st.sampled_from(
+    ["alpha", "beta", "gamma", "delta", "eps", "zeta", "eta", "theta", "café", "日本語", "ﬁn"]
+)
 _ROW_TEXTS = st.lists(_WORDS, max_size=14).map(" ".join)
 _THRESHOLDS = st.sampled_from([0.1, 0.5, 0.75, 0.9, 1.0])
 

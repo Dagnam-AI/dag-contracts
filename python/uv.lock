@@ -132,12 +132,12 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "dagnam-core", marker = "extra == 'fast'", specifier = ">=0.1.1,<0.2" }]
+requires-dist = [{ name = "dagnam-core", marker = "extra == 'fast'", specifier = "==0.1.1" }]
 provides-extras = ["fast"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "dagnam-core", specifier = ">=0.1.1,<0.2" },
+    { name = "dagnam-core", specifier = "==0.1.1" },
     { name = "hypothesis" },
     { name = "poethepoet", specifier = ">=0.46.0" },
     { name = "pyright" },
