@@ -43,6 +43,8 @@ from itertools import combinations
 import re
 from typing import TYPE_CHECKING, Any
 
+from dagnam_contracts.hygiene import _backend
+
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
 
@@ -155,6 +157,12 @@ def shingles(text: str, size: int = SHINGLE_SIZE) -> frozenset[str]:
 
 def minhash_signature(shingle_set: frozenset[str]) -> tuple[int, ...]:
     """MinHash signature of `shingle_set`; all-`_MASK64` when it is empty."""
+    core = _backend.active()
+    if core is not None:
+        try:
+            return tuple(core.minhash_signature(list(shingle_set)))
+        except UnicodeEncodeError:
+            pass  # not UTF-8 (a lone surrogate): the Python below reads it
     if not shingle_set:
         return (_MASK64,) * NUM_PERMUTATIONS
 
@@ -194,11 +202,29 @@ def compute_near_duplicates(
     Raises `ValueError` for a threshold outside ``(0, 1]``: 0 would merge
     every row in the dataset into one cluster, which is never what a caller
     meant to ask for.
+
+    The compiled core is used only for a threshold that is exactly a ``float`` or an
+    ``int``: it reads the threshold as a 64-bit float, so a ``Decimal``, a ``Fraction``, a
+    ``bool`` or a subclass of ``float`` takes the Python, whose comparison is exact.
     """
     if not 0 < threshold <= 1:
         raise ValueError(f"threshold must be in (0, 1]; got {threshold}")
 
-    signatures = [minhash_signature(shingles(row_text(row))) for row in rows]
+    texts = [row_text(row) for row in rows]
+    core = _backend.active() if type(threshold) in (float, int) else None
+    # `row_text` turns every character that is not a word character or whitespace, a lone
+    # surrogate included, into a space, so the core always receives UTF-8 here.
+    if core is not None:
+        duplicates, found = core.near_duplicates(texts, threshold)
+        return NearDedupResult(
+            threshold=threshold,
+            duplicate_indices=list(duplicates),
+            pairs=[NearDuplicatePair(kept, dup, sim) for kept, dup, sim in found],
+            kept_count=len(rows) - len(duplicates),
+            duplicate_count=len(duplicates),
+        )
+
+    signatures = [minhash_signature(shingles(text)) for text in texts]
 
     # Sorted so the union-find below runs in a fixed order: a row that is
     # near-duplicate of two others that are not near-duplicates of each other

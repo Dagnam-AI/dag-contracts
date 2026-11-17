@@ -61,6 +61,7 @@ from test_credentials import MEMBERS, NEGATIVES as FINDER_NEGATIVES, POSITIVES a
 from test_detectors import NEGATIVES as DETECTOR_NEGATIVES, POSITIVES as DETECTOR_POSITIVES
 from test_pii import LABELLED_CORPUS
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.near_dedup import (
     NUM_PERMUTATIONS,
     minhash_signature,
@@ -201,7 +202,16 @@ def _regions_policy(rows: list[dict[str, Any]]) -> tuple[list[str], list[str], s
 
 
 def build() -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
-    """The cases of each file, as the reference produced them, and the counts."""
+    """The cases of each file, as the reference produced them, and the counts.
+
+    Always the Python reference, whether or not the compiled core is installed: a corpus
+    the core is checked against must not be computed by the core.
+    """
+    with _backend.reference():
+        return _build()
+
+
+def _build() -> tuple[dict[str, list[dict[str, Any]]], dict[str, int]]:
     rows = random_rows(SEED, ROWS)
     first, everything, candidates, utf8 = _regions_policy(rows)
     kept = [text for text in everything if exportable(text)]

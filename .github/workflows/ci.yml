@@ -59,7 +59,8 @@ jobs:
   python:
     name: Python distribution
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The gate runs the suite twice (compiled backend, then pure Python).
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -93,19 +94,54 @@ jobs:
       # v0.1.0 shipped broken because a module imported the `dagnam` SDK, which
       # is not a dependency -- invisible in a dev environment where the SDK was
       # already installed. A venv with ONLY the wheel is what catches that, so
-      # `--no-deps` and an empty environment are the point, not caution.
+      # `--no-deps` and an empty environment are the point, not caution. The check
+      # runs from an empty directory: `python -c` puts the current directory first on
+      # `sys.path`, so from `python/` it would import the source tree and pass without
+      # the wheel; the `__file__` assertion makes that failure loud.
       - name: Install the wheel alone and validate
         working-directory: python
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --quiet --no-deps dist/*.whl
+          cd "$(mktemp -d)"
           /tmp/smoke/bin/python -c "
           import dagnam_contracts as c
+          assert 'site-packages' in c.__file__, c.__file__
           assert c.COMPONENT_REGISTRY, 'schema failed to load from the wheel'
           errs = c.validate_params('convolution-layer', {'filters': -999}, node_id='n')
           assert errs, 'wheel validated an out-of-range value'
           print(f'ok: {len(c.COMPONENT_REGISTRY)} components, schema v{c.SCHEMA_VERSION}')
           "
+
+      # The `fast` extra must resolve from the wheel's own metadata and put the compiled
+      # core to work; a metadata typo would otherwise ship in an immutable release. Run
+      # from an empty directory, for the reason above, and through the package: one real
+      # findings call proves the core answers, not merely that it imported. The same
+      # script under DAGNAM_CONTRACTS_PURE must give the same answer on the Python.
+      - name: Install the wheel with the fast extra
+        working-directory: python
+        run: |
+          python -m venv /tmp/fast
+          /tmp/fast/bin/pip install --quiet "$(ls "$PWD"/dist/*.whl)[fast]"
+          cd "$(mktemp -d)"
+          cat > check_fast.py <<'PY'
+          import os
+          import sys
+
+          import dagnam_contracts
+          from dagnam_contracts.hygiene import backend
+          from dagnam_contracts.hygiene.spans import findings
+
+          assert "site-packages" in dagnam_contracts.__file__, dagnam_contracts.__file__
+          expected = os.environ["EXPECT_BACKEND"]
+          assert backend() == expected, (backend(), expected)
+          assert ("dagnam_core.hygiene" in sys.modules) == (expected == "rust")
+          spans = [(s, e, d.code) for s, e, d in findings("write to jane@example.com today")]
+          assert spans == [(9, 25, "PII_EMAIL")], spans
+          print("ok:", backend(), spans)
+          PY
+          EXPECT_BACKEND=rust /tmp/fast/bin/python check_fast.py
+          EXPECT_BACKEND=python DAGNAM_CONTRACTS_PURE=1 /tmp/fast/bin/python check_fast.py
 
   npm:
     name: npm distribution

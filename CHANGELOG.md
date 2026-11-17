@@ -8,6 +8,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
+## [0.6.0] - 2026-11-17
+
+### Added
+
+- **`dagnam-contracts[fast]`: an optional compiled backend for the dataset-hygiene
+  functions.** The extra installs `dagnam-core` (pinned to the one version this release
+  was tested against), which runs the PII scan (`scan_rows`, `redact_rows`,
+  `apply_pii_policy`), `minhash_signature` and `compute_near_duplicates` in compiled
+  code. Without the extra nothing changes: `dependencies` is still empty.
+- **The Python stays the reference.** A differential test runs both over the same
+  inputs, and the reference corpus the core is checked against is always computed by the
+  Python, whatever is installed. The one documented exception: the core's tables of
+  letters, digits and whitespace come from Unicode 15.1, so on a few characters first
+  assigned in another Unicode version (CJK Extension I on Python 3.12, the Unicode 16
+  letters and digits on Python 3.14; Python 3.13 agrees) its answer differs from the
+  interpreter's own, and a finding's extent can differ (see the README). Near-duplicate
+  detection is not affected.
+- **`dagnam_contracts.hygiene.backend()`** (also `dagnam_contracts.backend`) returns
+  `"rust"` when the compiled core is in use and `"python"` otherwise.
+- **`DAGNAM_CONTRACTS_PURE`** forces the Python everywhere even when the core is
+  installed. It is read once, at import: unset, empty, `0`, `false`, `no` and `off`
+  leave the core on, any other value turns it off.
+- `compute_near_duplicates` hands the core only a threshold that is exactly a `float`
+  or an `int`; any other number type is compared exactly, in Python.
+- Wheels for the core: Linux x86_64 and aarch64 (glibc 2.28 or later, and musl), macOS
+  (x86_64 and arm64) and Windows x86_64, CPython 3.12 or later and the free-threaded 3.14.
+  Elsewhere (for example free-threaded 3.13, PyPy, older glibc, Windows on arm64) there is
+  no wheel and pip builds `dagnam-core` from source: that takes minutes and needs Rust
+  1.99 or later (the build tool downloads a toolchain when none is installed, and fails
+  offline or with an older Rust). Install `dagnam-contracts` without the extra there.
+- The gate runs the whole suite twice, on the compiled backend and on the pure Python,
+  each at 100% statement and branch coverage.
+- `@dagnam/contracts` (npm) has no change in this release and moves to 0.6.0 only to
+  stay in step with PyPI.
+
+### Known limits
+
+- Near-duplicate detection compares every pair of rows with identical normalised text,
+  so its memory grows with the square of the number of identical texts. This holds on
+  both backends.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added

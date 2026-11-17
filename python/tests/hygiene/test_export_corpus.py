@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import types
 from typing import Any
 
 from corpus_atoms import HELD_CODE, TEST_MARKERS
@@ -17,6 +18,7 @@ from corpus_regions import leaks
 from export_corpus import build, export
 import pytest
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.detectors import _IBAN_LENGTHS, PII_CODES
 from dagnam_contracts.hygiene.near_dedup import (
     compute_near_duplicates,
@@ -43,7 +45,8 @@ def _read(directory: Path, name: str) -> list[dict[str, Any]]:
 
 
 def _codes(text: str) -> list[list[Any]]:
-    return [[s, e, d.code] for s, e, d in findings(text)]
+    with _backend.reference():
+        return [[s, e, d.code] for s, e, d in findings(text)]
 
 
 @pytest.fixture(scope="module")
@@ -56,7 +59,8 @@ def test_every_minhash_case_is_what_the_reference_computes(corpus: Corpus) -> No
     cases = _read(corpus[0], "minhash.jsonl")
     assert len(cases) >= 50 and len(cases) == corpus[1]["minhash"]
     for case in cases:
-        signature = minhash_signature(frozenset(case["shingles"]))
+        with _backend.reference():
+            signature = minhash_signature(frozenset(case["shingles"]))
         assert [str(v) for v in signature] == case["signature"]
     assert any(case["shingles"] == ["a", "a"] for case in cases)
 
@@ -78,7 +82,8 @@ def test_every_near_dedup_text_is_row_text_output_and_every_verdict_is_the_refer
     for case in cases:
         texts: list[str] = case["texts"]
         assert all(normalised(text) == text for text in texts)
-        result = compute_near_duplicates([{"t": text} for text in texts], case["threshold"])
+        with _backend.reference():
+            result = compute_near_duplicates([{"t": text} for text in texts], case["threshold"])
         assert result.duplicate_indices == case["duplicate_indices"]
         pairs = [[p.kept_index, p.duplicate_index, p.similarity] for p in result.pairs]
         assert pairs == case["pairs"]
@@ -246,6 +251,23 @@ def test_every_class_that_remains_keeps_its_minimum(corpus: Corpus) -> None:
 def test_near_dedup_group_sizes_survive_the_credential_drops(corpus: Corpus) -> None:
     sizes = Counter(len(case["texts"]) for case in _read(corpus[0], "near_dedup.jsonl"))
     assert sizes[40] == 8 * len(THRESHOLDS) and sizes[100] == len(THRESHOLDS)
+
+
+def test_the_export_is_the_references_whatever_core_is_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def refuse(*_: object) -> Any:
+        calls.append("called")
+        raise AssertionError("the corpus a core is checked against must not be computed by it")
+
+    core = types.SimpleNamespace(findings=refuse, minhash_signature=refuse, near_duplicates=refuse)
+    monkeypatch.setattr(_backend, "_ACTIVE", core)
+    assert _backend.backend() == "rust"
+    files, _ = build()
+    assert calls == [] and len(files["findings.jsonl"]) >= 500
+    assert _backend.backend() == "rust"  # forced for the build only
 
 
 @pytest.mark.parametrize("seed", ["1", "2"])

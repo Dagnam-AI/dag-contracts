@@ -1,6 +1,6 @@
 [project]
 name = "dagnam-contracts"
-version = "0.5.0"
+version = "0.6.0"
 description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -22,12 +22,20 @@ classifiers = [
 # carries generated JSON and a plain-Python interpreter of it.
 dependencies = []
 
+[project.optional-dependencies]
+# The compiled backend for the hygiene functions (`dagnam-core`). Optional on purpose: the
+# Python in this package is the reference and runs wherever the compiled one has no wheel.
+# Exactly the core this release was tested against: a core release can change a result
+# without changing its binding contract, so each contracts release names its core.
+fast = ["dagnam-core==0.1.1"]
+
 [project.urls]
 Homepage = "https://github.com/Dagnam-AI/dag-contracts"
 Source = "https://github.com/Dagnam-AI/dag-contracts"
 
 [dependency-groups]
 dev = [
+    "dagnam-core==0.1.1",
     "hypothesis",
     "poethepoet>=0.46.0",
     "pyright",
@@ -100,7 +108,10 @@ test-cov = { cmd = "pytest tests -q --cov=dagnam_contracts --cov-branch --cov-re
 lint = { cmd = "ruff check dagnam_contracts tests", help = "Lint" }
 format-check = { cmd = "ruff format --check dagnam_contracts tests", help = "Check formatting" }
 typecheck = { cmd = "pyright dagnam_contracts tests", help = "Type-check (strict)" }
-check = { sequence = ["lint", "format-check", "typecheck", "test"], help = "Run every quality gate" }
+# The same suite on the Python reference: the compiled backend is off, so the code the
+# dispatch bypasses is measured too. Each of the two runs holds 100%.
+test-pure = { cmd = "pytest tests -q --cov=dagnam_contracts --cov-branch --cov-report=term-missing", env = { DAGNAM_CONTRACTS_PURE = "1" }, help = "Run the suite on the pure Python backend (fails under 100%)" }
+check = { sequence = ["lint", "format-check", "typecheck", "test", "test-pure"], help = "Run every quality gate, on both backends" }
 
 
 [tool.ruff]
