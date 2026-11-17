@@ -326,8 +326,10 @@ def _entropy_starts(text: str, start: int, end: int) -> range:
     """The ``s`` in ``start..end`` for which ``text[s:end]`` matches `_HIGH_ENTROPY`.
 
     That is: after the last character outside its alphabet, no later than the last letter
-    and the last digit, and at least 16 from the end. Found in one pass over the value, so
-    that each name inside it is judged by a lookup (`_bare_assignments`).
+    and the last digit, and at least 16 from the end. Found with one scan for the last
+    character outside the alphabet and one search from the end for each of the 62 letters and
+    digits, a fixed number of passes over the value, so that each name inside it is judged
+    by a lookup (`_bare_assignments`).
     """
     outside = deque(_OUTSIDE_ENTROPY.finditer(text, start, end), maxlen=1)
     first = outside[0].end() if outside else start

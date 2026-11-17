@@ -130,6 +130,11 @@ MAX_COMPARISONS = 40_000_000
 A candidate pair is two rows that share an LSH band, counted once however many bands they
 share, whether or not it turns out to be a near-duplicate. The call raises
 `NearDedupLimitError` instead of making the comparison after the last one this allows.
+
+The count at which two implementations stop is the same because the candidates are walked
+in one deterministic order, the one `_candidate_pairs` defines: ascending ``left`` row,
+and for each ``left`` its ``right`` rows ascending, each pair once. A port counts the
+pairs it yields in that order.
 """
 
 MAX_PAIRS = 20_000_000

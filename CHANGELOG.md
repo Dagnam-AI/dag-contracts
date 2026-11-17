@@ -19,9 +19,12 @@ before 0.4.0 are described in `README.md`.
   right after the refused name, and each assignment is judged on its own, in time and
   memory that do not grow with the number of names in the run. A value that vouches for
   itself is still taken whole, but a name inside it no longer hides an assignment whose
-  own value starts after it (`api_key = abc123/password = ...`): everything the scan found
-  before it still finds, over 1.2 million fuzzed texts. The compiled core (`dagnam-core`
-  0.1.1) still has the old behaviour until it is updated to this release's reference.
+  own value starts after it (`<name> = <value>/<name> = <value>`, the second name written
+  inside the first value). No character the old finder covered is lost by the finder
+  (1.2 million fuzzed texts). At the level of the whole scan, 27 of 40,000 random texts
+  change label: 26 of them from secret to email and still redacted, and one leaves a
+  joiner and the next credential's name unredacted (no value characters). The compiled
+  core (`dagnam-core` 0.1.1) still has the old behaviour until it is updated to this release's reference.
 
 ### Added
 
