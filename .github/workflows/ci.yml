@@ -7,6 +7,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A daily run on main, so the differential test of the compiled backend has a run for every
+  # day it has stayed green (the gate before the backend becomes a default dependency counts them).
+  schedule:
+    - cron: "17 5 * * *"
   # The release workflow calls this file, so a tag cannot publish a commit
   # these jobs would have failed.
   workflow_call:
