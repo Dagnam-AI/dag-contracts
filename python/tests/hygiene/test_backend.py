@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterator
+import contextvars
 from decimal import Decimal
 from fractions import Fraction
 import importlib
@@ -295,7 +296,10 @@ def test_reference_does_not_reach_another_thread(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(_backend, "_ACTIVE", types.SimpleNamespace())
     seen: list[str] = []
     with _backend.reference():
-        thread = threading.Thread(target=lambda: seen.append(backend()))
+        # A fresh context: where a thread inherits its starter's context (free-threaded
+        # builds, by default) the block would otherwise reach it, as documented.
+        fresh = contextvars.Context()
+        thread = threading.Thread(target=lambda: fresh.run(lambda: seen.append(backend())))
         thread.start()
         thread.join()
         assert backend() == "python"

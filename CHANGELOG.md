@@ -33,10 +33,11 @@ before 0.4.0 are described in `README.md`.
 - `compute_near_duplicates` hands the core only a threshold that is exactly a `float`
   or an `int`; any other number type is compared exactly, in Python.
 - Wheels for the core: Linux x86_64 and aarch64 (glibc 2.28 or later, and musl), macOS
-  and Windows x86_64, CPython 3.12 or later and the free-threaded 3.14. Elsewhere (for
-  example free-threaded 3.13, PyPy, older glibc, Windows on arm64) there is no wheel and
-  pip builds `dagnam-core` from source, which needs a Rust toolchain; install
-  `dagnam-contracts` without the extra there.
+  (x86_64 and arm64) and Windows x86_64, CPython 3.12 or later and the free-threaded 3.14.
+  Elsewhere (for example free-threaded 3.13, PyPy, older glibc, Windows on arm64) there is
+  no wheel and pip builds `dagnam-core` from source: that takes minutes and needs Rust
+  1.99 or later (the build tool downloads a toolchain when none is installed, and fails
+  offline or with an older Rust). Install `dagnam-contracts` without the extra there.
 - The gate runs the whole suite twice, on the compiled backend and on the pure Python,
   each at 100% statement and branch coverage.
 - `@dagnam/contracts` (npm) has no change in this release and moves to 0.6.0 only to

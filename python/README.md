@@ -145,11 +145,13 @@ the core only a threshold that is exactly a `float` or an `int`; a `Decimal`, a
 `Fraction` or a `bool` is compared exactly, in Python.
 
 `[fast]` installs the core from a wheel on Linux (x86_64 and aarch64, glibc 2.28 or
-later, and musl), macOS and Windows (x86_64), for CPython 3.12 or later, and for the
-free-threaded 3.14. Anywhere else (free-threaded 3.13, PyPy, older glibc, Windows on
-arm64) there is no wheel, and pip falls back to the source package, which needs a Rust
-toolchain (1.99 or later) and fails without one. There, install plain `dagnam-contracts`:
-`dependencies` stays empty, and the extra is the only way the core arrives.
+later, and musl), macOS (x86_64 and arm64) and Windows (x86_64), for CPython 3.12 or
+later, and for the free-threaded 3.14. Anywhere else (free-threaded 3.13, PyPy, older
+glibc, Windows on arm64) there is no wheel, and pip falls back to the source package,
+which needs Rust 1.99 or later: it compiles for minutes, the build tool downloads a Rust
+toolchain itself when none is installed, and it fails offline or with an older Rust.
+There, install plain `dagnam-contracts`: `dependencies` stays empty, and the extra is the
+only way the core arrives.
 
 Contributing: the development environment installs the core, so it needs a platform with
 a wheel (or a Rust toolchain).

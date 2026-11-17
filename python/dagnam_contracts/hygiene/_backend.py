@@ -54,8 +54,10 @@ def reference() -> Generator[None]:
     """Run the block on the Python reference whatever is installed.
 
     For code that must not depend on the core, such as the reference corpus the core
-    itself is checked against. Scoped to the current thread (or task), so another thread
-    keeps its own backend.
+    itself is checked against. Scoped to the current context: asyncio tasks, and threads on
+    builds where a thread inherits its starter's context (the free-threaded ones, by
+    default), started inside the block run on the Python too; other threads keep their own
+    backend.
     """
     token = _REFERENCE.set(True)
     try:
