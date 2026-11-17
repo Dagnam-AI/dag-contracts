@@ -156,10 +156,17 @@ only way the core arrives.
 Contributing: the development environment installs the core, so it needs a platform with
 a wheel (or a Rust toolchain).
 
-Known limit: near-duplicate detection compares every pair of rows whose normalised text
-is identical, so its memory grows with the square of the number of identical texts. A
-dataset in which a very large share of the rows is one repeated text should go through
-`compute_exact_duplicates` first.
+Known limit: the near-duplicate result lists every pair of rows judged near-duplicates,
+so its memory grows with the square of the number of identical normalised texts (about 70
+bytes a pair). `compute_near_duplicates` raises `NearDedupLimitError` for a batch of more
+than `MAX_TEXTS` (50,000) rows, a row of more than `MAX_TEXT_CHARS` (1,000,000) characters
+of string values, more than `MAX_TOTAL_CHARS` (20,000,000) in all, more than
+`MAX_COMPARISONS` (40,000,000) candidate pairs compared, or a result of more than
+`MAX_PAIRS` (20,000,000) pairs: about 6,300 rows with the same normalised text (rows with
+no string values, or only punctuation, are one empty text). The first three are checked
+before any work and before the compiled core is called; the last two are enforced by the
+Python path, and by the core from `dagnam-core` 0.2.0. A dataset in which a very large
+share of the rows is one repeated text should go through `compute_exact_duplicates` first.
 
 ## Versioning
 

@@ -8,6 +8,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
+## [Unreleased]
+
+### Fixed
+
+- **A credential after a value an ambiguous name refuses is found.** `token=<16+
+  letters>?password=...` (also `|`, `#`, `:-`, `:_`, `!` and `@` between them, and `/`, `+`,
+  `.`, `=` when the password has no digit) kept its password: the scan of bare values
+  jumped past the whole refused run, so every name inside it went unread. It now resumes
+  right after the refused name, and each assignment is judged on its own, in time and
+  memory that do not grow with the number of names in the run. A value that vouches for
+  itself is still taken whole, but a name inside it no longer hides an assignment whose
+  own value starts after it (`<name> = <value>/<name> = <value>`, the second name written
+  inside the first value). No character the old finder covered is lost by the finder
+  (1.2 million fuzzed texts). At the level of the whole scan, 27 of 40,000 random texts
+  change label: 26 of them from secret to email and still redacted, and one leaves a
+  joiner and the next credential's name unredacted (no value characters). The compiled
+  core (`dagnam-core` 0.1.1) still has the old behaviour until it is updated to this release's reference.
+
+### Added
+
+- **Limits on a near-duplicate batch.** `compute_near_duplicates` raises the new
+  `NearDedupLimitError` (a `ValueError`; the message names the limit and its value and
+  never holds a word of the rows) for:
+  - more than `MAX_TEXTS` (50,000) rows;
+  - more than `MAX_TEXT_CHARS` (1,000,000) characters in one row's string values, or
+    `MAX_TOTAL_CHARS` (20,000,000) in all of them. These are read on the rows as they were
+    sent, before any is normalised, so a row of a hundred megabytes is refused having cost
+    nothing, and again on the normalised text, which casefolding can lengthen;
+  - more than `MAX_COMPARISONS` (40,000,000) candidate pairs compared, verified or not,
+    counted before each comparison: the call stops instead of making the one past the
+    limit;
+  - more than `MAX_PAIRS` (20,000,000) near-duplicate pairs, the same way. The result
+    lists every pair, so about **6,300 rows with the same normalised text are refused**
+    (n rows have n * (n - 1) / 2 pairs). That includes rows whose string values are empty
+    or all punctuation, and rows with no string values at all (a batch of numeric-only
+    rows): they all compare as the same empty text.
+
+  The first checks come after the threshold and before any work, and before a compiled
+  core is called. The pair and comparison limits are enforced by the Python path; the
+  compiled core of this release (`dagnam-core` 0.1.1) reads the pair limit only when it has
+  returned (it has built every pair by then) and has no comparison limit, so on the compiled
+  backend only the first three hold. `dagnam-core` 0.2.0 is to enforce all five before it
+  allocates: this release must not ship with the `fast` extra at 0.1.1. On the Python path
+  the worst cases measured, on a laptop with other jobs running (CPython 3.14): one text of
+  `MAX_TEXT_CHARS` characters 7.9 s and 139 MB; a batch of `MAX_TOTAL_CHARS` characters
+  157 s and 218 MB; 10,000 rows that share a band and duplicate nothing, stopped at
+  `MAX_COMPARISONS` after 149 s and 116 MB; 50,000 identical rows, stopped at `MAX_PAIRS`
+  after 94 s at 1.81 GiB. A batch can reach several of them: at most about five minutes
+  and 2 GiB. All six names are exported from `dagnam_contracts` and
+  `dagnam_contracts.hygiene`.
+
+### Changed
+
+- **Near-duplicate detection no longer holds the pairs three times.** The candidate pairs
+  are streamed in sorted order from a pointer per row and band instead of being built as
+  a set, sorted into a list and then verified into a third. 3,000 identical rows: 1.08 GB
+  and 39 s before, 0.38 GB and 20 s now; the result (duplicate indices, pairs and their
+  order, similarities) is unchanged. The memory that remains is the result itself, which
+  lists every pair of identical rows (about 70 bytes a pair): it still grows with the
+  square of the identical rows, and `MAX_PAIRS` bounds it.
+
 ## [0.6.0] - 2026-11-17
 
 ### Added

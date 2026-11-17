@@ -27,6 +27,8 @@ _TOKENS: dict[str, tuple[str, str, str]] = {
     "an sk- key's segments": ("sk-", "a-", ""),
     "a value after a name": ("password: ", "a", ""),
     "colons after a name": ("password: ", "a:", ""),
+    "a refused value of names": ("token=?", "a.key=", ""),
+    "a refused value of names and colons": ("token=?", "a.key=:x", ""),
     "a half-quoted value": ('password="', "a", ""),
     "a quoted value never closed": ('"password": "', "a", ""),
     "a quoted value with escaped quotes": ('"password": "', 'a\\"', ""),

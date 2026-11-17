@@ -69,7 +69,9 @@ this may say that a row holds no secrets.
   ``top_secret``; the list is `_FLAG_WORDS`), and not a blank or flag-like value
   (``yes``, ``no``, ``true``, ``false``, ``n/a``, ``none``, ``null``, ``-``).
   A bare value stops at a ``:`` that opens the next assignment
-  (``token=abc:password=…``), so each one is judged on its own.
+  (``token=abc:password=…``), so each one is judged on its own. So is one inside a
+  value an ambiguous name refused (``token=<16+ letters>?password=…``): the scan
+  resumes right after the refused name, never past the whole run.
 * ``sk-`` needs a run of 20+ letters and digits that holds a digit or mixes
   upper and lower case, which a real key has and kebab-case
   (``sk-learn-compatible-estimators``) does not.
@@ -89,7 +91,9 @@ Pure -- no I/O.
 from __future__ import annotations
 
 import base64
+from collections import deque
 import re
+import string
 
 SECRET_PLACEHOLDER = "<SECRET>"
 """What a redacted credential reads as, in place of the ``[REDACTED:<code>]`` form.
@@ -253,34 +257,88 @@ _DIGIT = re.compile(r"\d")
 
 
 def _bare_assignments(text: str) -> list[tuple[str, int, int]]:
-    """``(name, start, end)`` of every bare value assigned to a name like a credential."""
+    """``(name, start, end)`` of every bare value that is a credential under its name.
+
+    Two values are never taken for one another. A value an ambiguous name refuses is not
+    skipped: the walk resumes right after that name, so an assignment inside it
+    (``token=<16+ characters>?password=...``) is judged on its own. And a value that is
+    taken does not hide a name in it either: the walk goes on right after the name, and
+    passes over only the names whose own value starts inside the one taken (a name whose
+    value starts after it, past a space or a quote, is a new assignment). Every name
+    inside a refused value reads the value's own end (the run's, or the ``:`` that cut
+    it), and the one verdict that needs the value, whether the rest of it is high
+    entropy, is read from `_entropy_starts`: a fixed number of passes over the value, not
+    one for each name in it.
+    """
     found: list[tuple[str, int, int]] = []
     position = 0
+    taken_end = 0  # where the last credential taken ended
     run_end = -1  # the run of value characters containing `start`, once computed
+    # The last value an ambiguous name refused: where it starts and ends, and the starts
+    # inside it from which the rest of the value would be a credential on its own.
+    refused_start, refused_end, vouching = 0, -1, range(0)
     while (head := _ASSIGNMENT_HEAD.search(text, position)) is not None:
         start = head.end()
-        if start > run_end:
-            run_end = _run_end(_VALUE_RUN, text, start)
-        end = run_end
-        colon = text.find(":", start, end)
-        while colon != -1 and _NEXT_ASSIGNMENT.match(text, colon) is None:
-            colon = text.find(":", colon + 1, end)
-        if colon != -1:
-            end = colon
-        if end - start >= 16 or (end - start >= 6 and _DIGIT.search(text, start, end)):
-            found.append((head["n"], start, end))
-            position = end
+        position = head.start() + 1
+        if start < taken_end:
+            continue
+        within_refused = refused_start <= start <= refused_end
+        if within_refused:
+            end = refused_end
         else:
-            position = head.start() + 1
+            if start > run_end:
+                run_end = _run_end(_VALUE_RUN, text, start)
+            end = run_end
+            colon = text.find(":", start, end)
+            while colon != -1 and _NEXT_ASSIGNMENT.match(text, colon) is None:
+                colon = text.find(":", colon + 1, end)
+            if colon != -1:
+                end = colon
+        if not (end - start >= 16 or (end - start >= 6 and _DIGIT.search(text, start, end))):
+            continue
+        name = head["n"]
+        if within_refused:
+            # A refused value holds no shape and no vouched key (a suffix of it would hold
+            # the same), so the rest of it is a credential only by being high entropy.
+            credential = name.lower() not in _AMBIGUOUS or start in vouching
+        else:
+            credential = _is_credential(name, text[start:end])
+            if not credential:
+                refused_start, refused_end = start, end
+                vouching = _entropy_starts(text, start, end)
+        if credential:
+            found.append((name, start, end))
+            taken_end = end
     return found
 
 
 _MEMBER_NAME = re.compile(rf"(?:^|[^a-z0-9])(?P<n>{_NAMES})$")
 # ponytail: "high entropy" is a character-class proxy (16+, letters AND digits,
 # no spaces), not a measured entropy; add a Shannon floor if ids trip it.
-_HIGH_ENTROPY = re.compile(r"(?=[^\s]*[A-Za-z])(?=[^\s]*\d)[A-Za-z0-9._~+/=-]{16,}")
+_ENTROPY_CHARS = "A-Za-z0-9._~+/=-"
+_HIGH_ENTROPY = re.compile(rf"(?=[^\s]*[A-Za-z])(?=[^\s]*\d)[{_ENTROPY_CHARS}]{{16,}}")
+_OUTSIDE_ENTROPY = re.compile(rf"[^{_ENTROPY_CHARS}]")
 # An `sk-` key under a name that vouches for it: any 20+ run, digits or not.
 _VOUCHED_KEY = re.compile(r"(?<![A-Za-z0-9_-])sk-(?:[A-Za-z0-9_-]*-)?[A-Za-z0-9_]{20,}")
+
+
+def _entropy_starts(text: str, start: int, end: int) -> range:
+    """The ``s`` in ``start..end`` for which ``text[s:end]`` matches `_HIGH_ENTROPY`.
+
+    That is: after the last character outside its alphabet, no later than the last letter
+    and the last digit, and at least 16 from the end. Found with one scan for the last
+    character outside the alphabet and one search from the end for each of the 62 letters and
+    digits, a fixed number of passes over the value, so that each name inside it is judged
+    by a lookup (`_bare_assignments`).
+    """
+    outside = deque(_OUTSIDE_ENTROPY.finditer(text, start, end), maxlen=1)
+    first = outside[0].end() if outside else start
+    last = min(
+        max(text.rfind(char, start, end) for char in string.ascii_letters),
+        max(text.rfind(char, start, end) for char in string.digits),
+        end - 16,
+    )
+    return range(first, last + 1)
 
 
 def _is_user_pass(b64: str) -> bool:
@@ -406,7 +464,7 @@ def find_secrets(text: str) -> list[tuple[int, int]]:
             for m in _QUOTED_ASSIGNMENT.finditer(text)
             if _is_credential(m["n"], m["s"] or m["t"])
         ]
-        + [(a, b) for name, a, b in _bare_assignments(text) if _is_credential(name, text[a:b])]
+        + [(a, b) for _, a, b in _bare_assignments(text)]
     )
     merged: list[tuple[int, int]] = []
     for start, end in spans:

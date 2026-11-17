@@ -231,6 +231,51 @@ def _assignment_texts() -> set[str]:
     return texts
 
 
+def _refused_run_texts() -> set[str]:
+    """An assignment inside a value an ambiguous name refuses (the R1 shapes).
+
+    The refused value is 20 letters, which no ambiguous name vouches for. What follows
+    it, joined by characters a value may hold, is read on its own: an assignment that
+    takes any value, one that does vouch, a run cut by a colon, a run of names, and the
+    joiners (`/ + . =`) that make the whole run one value when it holds a digit.
+    """
+    first, second, digits = VALUES
+    ambiguous = [n for n in NAMES if _finder._credential_name(n) in _finder._AMBIGUOUS]
+    anything = [n for n in NAMES if _finder._credential_name(n) not in {None, *_finder._AMBIGUOUS}]
+    refused = "Paris" * 4
+    joiners = ["?", "|", ":-", ":_", "#", "!", "@", "/", "+", ".", "=", "&", " "]
+    values = [first, "horse" * 4, second, digits]
+    wrappers = ["{}", "GET /x?{} ok", "export {}", "cfg: {};"]
+    texts: set[str] = set()
+    cells = itertools.product(ambiguous, _SEPARATORS[:3], joiners, anything)
+    for index, (name, separator, joiner, other) in enumerate(cells):
+        text = f"{name}{separator}{refused}{joiner}{other}={values[index % len(values)]}"
+        texts.add(wrappers[index % len(wrappers)].format(text))
+    for name, other in itertools.product(ambiguous, ambiguous):
+        for tail in (second, "short", refused, f"{first}:{anything[0]}={second}"):
+            texts.add(f"{name}={refused}?{other}={tail}")
+        for unit in (f"a.{other}=", f"aa.{other}=:x", f"a-{other}=b:"):
+            texts.add(f"{name}=?" + unit * 6)
+            texts.add(f"{name}=?" + unit * 6 + second)
+    texts |= _inner_name_texts(ambiguous, anything, refused)
+    return texts
+
+
+def _inner_name_texts(ambiguous: list[str], anything: list[str], refused: str) -> set[str]:
+    """A name that stands in a value and is not skipped with it: the value of the first
+    assignment (refused, or taken) runs up to a space, and the assignment after that space
+    is a new one, whose own name starts inside the first value."""
+    first, second, digits = VALUES
+    texts: set[str] = set()
+    cells = itertools.product(ambiguous, itertools.permutations(anything[:4], 2), (" = ", ": "))
+    for index, (name, (inner, other), separator) in enumerate(cells):
+        lead = (refused, second, first)[index % 3]
+        joiner = ("/", "?", "|")[index % 3]
+        texts.add(f"{name}={lead}{joiner}{inner}{separator}{digits}/{other}{separator}{first}")
+        texts.add(f"{name}={lead}/{inner}{separator}{digits}{joiner}{other}{separator}{second}")
+    return texts
+
+
 def _url_and_pem_texts(generator: random.Random) -> set[str]:
     texts = {
         f"{scheme}{URL_SEP}{user}@{host}"
@@ -269,6 +314,7 @@ def generated_texts(seed: int) -> set[str]:
     return (
         _provider_texts()
         | _assignment_texts()
+        | _refused_run_texts()
         | _url_and_pem_texts(generator)
         | _jwt_texts(generator)
     )
