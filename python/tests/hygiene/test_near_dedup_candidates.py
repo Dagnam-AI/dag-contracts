@@ -121,7 +121,12 @@ class TestTheResultIsTheOnlyQuadraticPart:
         """300 identical rows: 44,850 pairs. What the peak holds beyond the result is linear
         in the rows (their signatures, a pointer per band) and not in the pairs: it was a set
         and a sorted list of all the pairs, 5 MB here. A pair costs a list slot and its
-        object, and nothing else: the floats are shared."""
+        object, and nothing else: the floats are shared.
+
+        The bounds are measured, with their margin: a pair holds 65.2 to 65.3 bytes on
+        CPython 3.12, 3.13, 3.13t and 3.14 (limit 72, 10% over); the rest holds 6,413 to
+        6,432 bytes a row on the GIL builds and 9,535 on 3.13t (limit 12,000, 26% over the
+        worst), because a free-threaded build's objects are larger."""
         rows = [{"t": "the same words in every single row here"}] * 300
         tracemalloc.start()
         try:
@@ -132,7 +137,7 @@ class TestTheResultIsTheOnlyQuadraticPart:
 
         assert len(result.pairs) == 300 * 299 // 2
         assert retained / len(result.pairs) <= 72
-        assert peak - retained <= 9_000 * len(rows)
+        assert peak - retained <= 12_000 * len(rows)
         assert len({id(pair.similarity) for pair in result.pairs}) == 1
 
     def test_the_pairs_are_the_same_as_ever_in_the_same_order(self) -> None:

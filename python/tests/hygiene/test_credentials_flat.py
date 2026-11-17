@@ -48,16 +48,18 @@ def bare_walk_before_r1(text: str) -> list[tuple[str, int, int]]:
 def _credentials_of_the_old_bare(text: str) -> list[tuple[str, int, int]]:
     """The values `_OLD_BARE` finds that a name vouches for, each name judged on the whole
     run after it: a value an ambiguous name refuses is passed over by one character, not by
-    the whole run (`test_credentials_refused.py`). Quadratic on purpose; the walk is not."""
+    the whole run (`test_credentials_refused.py`), and a name inside a value that was taken
+    is read too, unless its own value starts inside the taken one. Quadratic on purpose;
+    the walk is not."""
     found: list[tuple[str, int, int]] = []
     position = 0
+    taken_end = 0
     while (match := _OLD_BARE.search(text, position)) is not None:
         start, end = match.span("s")
-        if cred._is_credential(match["n"], text[start:end]):
+        position = match.start() + 1
+        if start >= taken_end and cred._is_credential(match["n"], text[start:end]):
             found.append((match["n"], start, end))
-            position = end
-        else:
-            position = match.start() + 1
+            taken_end = end
     return found
 
 

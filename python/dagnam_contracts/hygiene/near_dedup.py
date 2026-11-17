@@ -32,20 +32,43 @@ Design, and why each piece is what it is:
   asymmetry is what makes the operation idempotent: re-running over the kept
   rows finds nothing further.
 
-* **A batch has limits, because the rows are not the caller's.** `compute_near_duplicates`
-  raises `NearDedupLimitError` (a `ValueError`) for more than `MAX_TEXTS` rows, a
-  comparison text (what `row_text` returns) of more than `MAX_TEXT_CHARS` characters, more
-  than `MAX_TOTAL_CHARS` in all -- each before anything is shingled or hashed, and after
-  the threshold check -- and for a result of more than `MAX_PAIRS` pairs, as soon as the
-  walk finds the one past it. The message names the limit and its value and holds no text.
-* **What it holds, measured** (CPython 3.14, reference backend, peak resident set). The
-  rows' signatures and band pointers cost about 8 KB a row: 50,000 distinct short rows
-  took 0.47 GB in 11 s. A text of `MAX_TEXT_CHARS` characters takes 1.4 s and about 15 MB
-  beyond itself to shingle. The result lists *every* verified pair, so n identical rows
-  hold n * (n - 1) / 2 pairs at about 80 bytes each: 3,000 took 0.38 GB in 20 s (1.08 GB in
-  39 s before the candidate pairs were streamed), and 50,000 identical rows reach
-  `MAX_PAIRS` after 54 s at 1.24 GB. Add the largest batch of texts (`MAX_TOTAL_CHARS`,
-  up to four bytes a character, 0.26 GB) and the worst case is about 1.5 GB, under 2 GiB.
+* **A batch has limits, because the rows are not the caller's.**
+  `compute_near_duplicates` raises `NearDedupLimitError` (a `ValueError`; the message names
+  the limit and its value and holds no text), after the threshold check and in this order:
+
+  - `MAX_TEXTS` rows; then, reading the rows as they were sent, before anything is
+    normalised and before a compiled core is called, `MAX_TEXT_CHARS` characters in the
+    string values of one row (joined by a space, as `row_text` joins them) and
+    `MAX_TOTAL_CHARS` in all of them (a string's length costs nothing, so a row of a
+    hundred megabytes is refused having cost nothing). Casefolding can lengthen a text
+    (`ß` is `ss`), so the same two limits are read again on the normalised text, still
+    before it is shingled.
+  - `MAX_COMPARISONS`: the number of candidate pairs (two rows that share an LSH band, each
+    pair once) the walk compares, verified or not. It is counted before each comparison,
+    and the call raises instead of making the one that would be number `MAX_COMPARISONS + 1`,
+    so another implementation counting this way stops at the same pair.
+  - `MAX_PAIRS`: the number of pairs found to be near-duplicates, which the result lists
+    in full. The call raises instead of keeping the one past it.
+
+  `MAX_COMPARISONS` and `MAX_PAIRS` are enforced by the Python walk. A compiled core builds
+  its candidates and its pairs itself: `dagnam-core` 0.1.1 reads the `MAX_PAIRS` limit only
+  when it returns (a batch of identical rows has built every pair by then) and has no
+  comparison limit. A release of `dagnam-core` (0.2.0) is to enforce all five before it
+  allocates; until the `fast` extra pins it, the bounds below are the Python path's, and
+  the compiled backend has only the three that the wrapper reads before calling it.
+* **What it holds, measured** (CPython 3.14, Python path, on a laptop with other jobs
+  running; one process, peak resident set including the interpreter's own 35 MB):
+  one text of `MAX_TEXT_CHARS` characters of one-character words, the most shingles a
+  character can buy, takes 7.9 s and 139 MB; 20 of them (`MAX_TOTAL_CHARS`) take 157 s and
+  218 MB, about 8 s for each million characters. 10,000 rows that all share a band and
+  duplicate nothing reach `MAX_COMPARISONS` after 149 s (3.7 microseconds a comparison) in
+  116 MB. 50,000 identical rows (the rows' signatures and band pointers cost about 8 KB a
+  row, 0.4 GB) reach `MAX_PAIRS` after 94 s at 1.81 GiB: the result is the one part that
+  grows with the square of the identical texts, at about 70 bytes a pair. A text, a
+  comparison and a pair limit can all be reached by one batch: the longest is
+  `MAX_TOTAL_CHARS` of text and `MAX_COMPARISONS` comparisons, about five minutes, and the
+  most memory about 2 GiB. The result is a list of pairs, not a count, so a caller that
+  needs a bounded answer for a bigger batch must cluster the identical texts first.
 
 Pure — no session, no I/O.
 """
@@ -94,22 +117,34 @@ MAX_TEXTS = 50_000
 """The most rows `compute_near_duplicates` takes: more raises `NearDedupLimitError`."""
 
 MAX_TEXT_CHARS = 1_000_000
-"""The most characters in one row's comparison text (what `row_text` returns)."""
+"""The most characters in one row's string values (joined by a space), as sent and as
+compared."""
 
-MAX_TOTAL_CHARS = 64_000_000
-"""The most characters in all the comparison texts together."""
+MAX_TOTAL_CHARS = 20_000_000
+"""The most characters in the string values of all the rows together, as sent and as
+compared."""
 
-MAX_PAIRS = 10_000_000
-"""The most verified pairs `compute_near_duplicates` returns.
+MAX_COMPARISONS = 40_000_000
+"""The most candidate pairs the Python walk compares (see the module docstring).
 
-The result lists every pair of rows judged near-duplicates, so a batch of n identical
-rows has n * (n - 1) / 2 of them; past this many the call raises `NearDedupLimitError`.
+A candidate pair is two rows that share an LSH band, counted once however many bands they
+share, whether or not it turns out to be a near-duplicate. The call raises
+`NearDedupLimitError` instead of making the comparison after the last one this allows.
+"""
+
+MAX_PAIRS = 20_000_000
+"""The most near-duplicate pairs `compute_near_duplicates` returns.
+
+The result lists every pair of rows judged near-duplicates, so a batch of n identical rows
+has n * (n - 1) / 2 of them (about 6,300 identical rows reach this); past this many the call
+raises `NearDedupLimitError`. Rows whose string values are all empty or all punctuation, and
+rows with no string values at all, compare as the same empty text.
 """
 
 
 class NearDedupLimitError(ValueError):
     """A batch is larger than `compute_near_duplicates` takes (`MAX_TEXTS`, `MAX_TEXT_CHARS`,
-    `MAX_TOTAL_CHARS` or `MAX_PAIRS`).
+    `MAX_TOTAL_CHARS`, `MAX_COMPARISONS` or `MAX_PAIRS`).
 
     The message names the limit and its value and carries no row text, so it can be logged
     and shown to the sender of the batch.
@@ -161,6 +196,18 @@ class NearDedupResult:
     a user is the same list the apply run acts on."""
 
 
+def _leaves(value: Any) -> Iterator[str]:
+    """The string leaves of a row, keys in sorted order; every other leaf is skipped."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key in sorted(value):
+            yield from _leaves(value[key])
+    elif isinstance(value, list):
+        for item in value:
+            yield from _leaves(item)
+
+
 def row_text(row: Mapping[str, Any]) -> str:
     """Flatten `row`'s string leaves into one normalised comparison string.
 
@@ -171,18 +218,7 @@ def row_text(row: Mapping[str, Any]) -> str:
     same thing, and including them would let a shared label pull two unrelated
     rows together.
     """
-
-    def _walk(value: Any) -> Iterator[str]:
-        if isinstance(value, str):
-            yield value
-        elif isinstance(value, dict):
-            for key in sorted(value):
-                yield from _walk(value[key])
-        elif isinstance(value, list):
-            for item in value:
-                yield from _walk(item)
-
-    joined = _PUNCTUATION.sub(" ", " ".join(_walk(row)))
+    joined = _PUNCTUATION.sub(" ", " ".join(_leaves(row)))
     return " ".join(joined.casefold().split())
 
 
@@ -251,11 +287,40 @@ def _candidate_pairs(signatures: list[tuple[int, ...]]) -> Iterator[tuple[int, i
             yield left, right
 
 
-def _comparison_texts(rows: list[dict[str, Any]]) -> list[str]:
-    """``row_text`` of every row, after the limits on the batch (the rows are read one at a
-    time, and the first row over a limit ends the read: nothing is shingled before that)."""
+def _check_the_batch(rows: list[dict[str, Any]]) -> None:
+    """The limits that the rows themselves answer, before any of them is normalised.
+
+    The rows are read as they come (a string's ``len`` costs nothing, whatever its size),
+    so a row of a hundred megabytes is refused having cost nothing, not the twenty-fold
+    copies that normalising it makes. A row's size here is the length of its string leaves
+    joined by a space, and the first row over a limit ends the read.
+    """
     if len(rows) > MAX_TEXTS:
         raise NearDedupLimitError(f"{len(rows)} texts is more than MAX_TEXTS ({MAX_TEXTS})")
+    total = 0
+    for row in rows:
+        size = -1  # the length of the leaves joined by a space, as `row_text` joins them
+        for leaf in _leaves(row):
+            size += len(leaf) + 1
+            if size > MAX_TEXT_CHARS:
+                raise NearDedupLimitError(
+                    f"a text of more than MAX_TEXT_CHARS ({MAX_TEXT_CHARS}) characters"
+                )
+        total += max(size, 0)
+        if total > MAX_TOTAL_CHARS:
+            raise NearDedupLimitError(
+                f"the texts hold more than MAX_TOTAL_CHARS ({MAX_TOTAL_CHARS}) characters"
+            )
+
+
+def _comparison_texts(rows: list[dict[str, Any]]) -> list[str]:
+    """``row_text`` of every row, once `_check_the_batch` has passed it.
+
+    The limits are read again on the normalised text, because casefolding can lengthen
+    it (``ß`` becomes ``ss``, a ligature up to three letters): a row inside the limits as
+    written may be over them as compared, and is refused before it is shingled.
+    """
+    _check_the_batch(rows)
     texts: list[str] = []
     total = 0
     for row in rows:
@@ -324,10 +389,15 @@ def compute_near_duplicates(
         return index
 
     seen: dict[float, float] = {}  # one float object per similarity, not one per pair
+    comparisons = 0
     for left, right in _candidate_pairs(signatures):
+        comparisons += 1
+        if comparisons > MAX_COMPARISONS:
+            raise NearDedupLimitError(f"more than MAX_COMPARISONS ({MAX_COMPARISONS}) comparisons")
         similarity = estimate_jaccard(signatures[left], signatures[right])
         if similarity < threshold:
             continue
+        _check_pairs(len(pairs) + 1)
         pairs.append(
             NearDuplicatePair(
                 kept_index=left,
@@ -335,7 +405,6 @@ def compute_near_duplicates(
                 similarity=seen.setdefault(similarity, similarity),
             )
         )
-        _check_pairs(len(pairs))
         root_left, root_right = _find(left), _find(right)
         if root_left != root_right:
             # Always attach the higher root to the lower one, so a cluster's
@@ -356,6 +425,7 @@ def compute_near_duplicates(
 __all__ = [
     "BANDS",
     "DEFAULT_THRESHOLD",
+    "MAX_COMPARISONS",
     "MAX_PAIRS",
     "MAX_TEXTS",
     "MAX_TEXT_CHARS",

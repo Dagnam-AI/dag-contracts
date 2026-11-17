@@ -1,9 +1,12 @@
 """The limits on a batch of rows for `compute_near_duplicates`.
 
-A service calls it on rows it did not write. The batch is refused before anything is
-shingled or hashed when it has more rows than `MAX_TEXTS`, a comparison text longer than
-`MAX_TEXT_CHARS` or more characters in all than `MAX_TOTAL_CHARS`; the result is refused,
-as soon as it is known to be too large, when it lists more than `MAX_PAIRS` pairs. The
+A service calls it on rows it did not write. The batch is refused, before any row is
+normalised, shingled or hashed and before the compiled core is called, when it has more
+rows than `MAX_TEXTS`, a row whose string values hold more than `MAX_TEXT_CHARS`
+characters, or more than `MAX_TOTAL_CHARS` in all; the same two limits are read again on
+the normalised text, which casefolding can lengthen. On the Python path the walk is
+refused when it has compared `MAX_COMPARISONS` candidate pairs, or found more than
+`MAX_PAIRS` near-duplicate pairs; for the core the pair limit is read when it returns. The
 error says which limit and its value, and never a word of the rows.
 """
 
@@ -19,6 +22,7 @@ import dagnam_contracts
 from dagnam_contracts import hygiene
 from dagnam_contracts.hygiene import _backend, near_dedup
 from dagnam_contracts.hygiene.near_dedup import (
+    MAX_COMPARISONS,
     MAX_PAIRS,
     MAX_TEXT_CHARS,
     MAX_TEXTS,
@@ -27,8 +31,8 @@ from dagnam_contracts.hygiene.near_dedup import (
     compute_near_duplicates,
 )
 
-# What no message may hold: the words of the rows under test.
-_SECRET = "zebra-quokka-4417"
+# What no message may hold: a word of the rows under test.
+_PLANTED = "zebra-quokka-4417"
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -42,7 +46,7 @@ def _rows(*texts: str) -> list[dict[str, Any]]:
 
 
 def test_the_limits_are_public_numbers_and_the_error_is_a_value_error() -> None:
-    for name in ("MAX_TEXTS", "MAX_TEXT_CHARS", "MAX_TOTAL_CHARS", "MAX_PAIRS"):
+    for name in ("MAX_TEXTS", "MAX_TEXT_CHARS", "MAX_TOTAL_CHARS", "MAX_COMPARISONS", "MAX_PAIRS"):
         value = getattr(hygiene, name)
         assert type(value) is int and value > 0
         assert getattr(near_dedup, name) == value
@@ -54,12 +58,13 @@ def test_the_limits_are_public_numbers_and_the_error_is_a_value_error() -> None:
 
 
 def test_the_limits_are_the_documented_ones() -> None:
-    """The compiled core mirrors these four numbers: a change here is a change there."""
-    assert (MAX_TEXTS, MAX_TEXT_CHARS, MAX_TOTAL_CHARS, MAX_PAIRS) == (
+    """The compiled core mirrors these five numbers: a change here is a change there."""
+    assert (MAX_TEXTS, MAX_TEXT_CHARS, MAX_TOTAL_CHARS, MAX_COMPARISONS, MAX_PAIRS) == (
         50_000,
         1_000_000,
-        64_000_000,
-        10_000_000,
+        20_000_000,
+        40_000_000,
+        20_000_000,
     )
 
 
@@ -75,8 +80,8 @@ class TestRowsAndCharacters:
         monkeypatch.setattr(near_dedup, "MAX_TEXTS", 3)
 
         with pytest.raises(NearDedupLimitError, match=r"MAX_TEXTS \(3\)") as raised:
-            compute_near_duplicates(_rows(_SECRET, "b", "c", "d"))
-        assert _SECRET not in str(raised.value)
+            compute_near_duplicates(_rows(_PLANTED, "b", "c", "d"))
+        assert _PLANTED not in str(raised.value)
         assert "4 texts" in str(raised.value)
 
     def test_the_real_most_rows_refuses_one_more_before_reading_any(self) -> None:
@@ -94,17 +99,27 @@ class TestRowsAndCharacters:
         monkeypatch.setattr(near_dedup, "MAX_TEXT_CHARS", 10)
 
         with pytest.raises(NearDedupLimitError, match=r"MAX_TEXT_CHARS \(10\)") as raised:
-            compute_near_duplicates(_rows("x", f"{_SECRET[:5]} {_SECRET[6:11]}"))
-        assert "11 characters" in str(raised.value)
-        assert _SECRET[:5] not in str(raised.value)
+            compute_near_duplicates(_rows("x", f"{_PLANTED[:5]} {_PLANTED[6:11]}"))
+        assert _PLANTED[:5] not in str(raised.value)
 
-    def test_a_text_is_counted_as_row_text_makes_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The comparison text, not the row's own: punctuation and runs of spaces are gone."""
+    def test_a_text_is_counted_as_it_is_written(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The characters of the string values, before anything is normalised: a row of
+        punctuation and spaces that would compare as two letters is still a long row."""
         monkeypatch.setattr(near_dedup, "MAX_TEXT_CHARS", 5)
 
-        result = compute_near_duplicates(_rows("a, , ,  ,   b!!!!!!!!!!!!!!!"))
+        with pytest.raises(NearDedupLimitError, match="MAX_TEXT_CHARS"):
+            compute_near_duplicates(_rows("a, , ,  ,   b!!!!!!!!!!!!!!!"))
 
-        assert result.kept_count == 1
+    def test_the_string_values_of_a_row_add_up_and_the_others_do_not(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(near_dedup, "MAX_TEXT_CHARS", 7)  # "abc def": joined by a space
+        fits = {"b": ["abc", {"z": "def"}], "a": 12345678901234567890, "c": None}
+        over = {"b": ["abc", {"z": "def"}], "a": "g"}
+
+        assert compute_near_duplicates([fits]).kept_count == 1
+        with pytest.raises(NearDedupLimitError, match="MAX_TEXT_CHARS"):
+            compute_near_duplicates([over])
 
     def test_the_real_most_characters_of_one_text_pass_and_one_more_does_not(self) -> None:
         compute_near_duplicates(_rows("a" * MAX_TEXT_CHARS))
@@ -124,8 +139,8 @@ class TestRowsAndCharacters:
         monkeypatch.setattr(near_dedup, "MAX_TOTAL_CHARS", 20)
 
         with pytest.raises(NearDedupLimitError, match=r"MAX_TOTAL_CHARS \(20\)") as raised:
-            compute_near_duplicates(_rows("a" * 10, _SECRET + "x" * 10, "c"))
-        assert _SECRET not in str(raised.value)
+            compute_near_duplicates(_rows("a" * 10, _PLANTED + "x" * 10, "c"))
+        assert _PLANTED not in str(raised.value)
 
 
 class TestTheOrderOfTheChecks:
@@ -184,9 +199,9 @@ class TestThePairs:
         monkeypatch.setattr(near_dedup, "estimate_jaccard", counting)
 
         with pytest.raises(NearDedupLimitError, match=r"MAX_PAIRS \(3\)") as raised:
-            compute_near_duplicates(_rows(*[_SECRET] * 60))
+            compute_near_duplicates(_rows(*[_PLANTED] * 60))
         assert len(compared) == 4
-        assert _SECRET not in str(raised.value)
+        assert _PLANTED not in str(raised.value)
 
     @pytest.mark.parametrize(("pairs", "refused"), [(3, False), (4, True)])
     def test_the_core_s_pairs_are_held_to_the_same_limit(

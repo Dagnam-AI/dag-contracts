@@ -24,6 +24,7 @@ from dagnam_contracts.hygiene.dedup import (
 from dagnam_contracts.hygiene.near_dedup import (
     BANDS,
     DEFAULT_THRESHOLD,
+    MAX_COMPARISONS,
     MAX_PAIRS,
     MAX_TEXT_CHARS,
     MAX_TEXTS,
@@ -57,6 +58,7 @@ from dagnam_contracts.hygiene.pii import (
 __all__ = [
     "BANDS",
     "DEFAULT_THRESHOLD",
+    "MAX_COMPARISONS",
     "MAX_PAIRS",
     "MAX_TEXTS",
     "MAX_TEXT_CHARS",

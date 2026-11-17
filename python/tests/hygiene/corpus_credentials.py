@@ -257,6 +257,22 @@ def _refused_run_texts() -> set[str]:
         for unit in (f"a.{other}=", f"aa.{other}=:x", f"a-{other}=b:"):
             texts.add(f"{name}=?" + unit * 6)
             texts.add(f"{name}=?" + unit * 6 + second)
+    texts |= _inner_name_texts(ambiguous, anything, refused)
+    return texts
+
+
+def _inner_name_texts(ambiguous: list[str], anything: list[str], refused: str) -> set[str]:
+    """A name that stands in a value and is not skipped with it: the value of the first
+    assignment (refused, or taken) runs up to a space, and the assignment after that space
+    is a new one, whose own name starts inside the first value."""
+    first, second, digits = VALUES
+    texts: set[str] = set()
+    cells = itertools.product(ambiguous, itertools.permutations(anything[:4], 2), (" = ", ": "))
+    for index, (name, (inner, other), separator) in enumerate(cells):
+        lead = (refused, second, first)[index % 3]
+        joiner = ("/", "?", "|")[index % 3]
+        texts.add(f"{name}={lead}{joiner}{inner}{separator}{digits}/{other}{separator}{first}")
+        texts.add(f"{name}={lead}/{inner}{separator}{digits}{joiner}{other}{separator}{second}")
     return texts
 
 

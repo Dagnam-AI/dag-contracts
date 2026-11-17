@@ -17,6 +17,7 @@ from hypothesis import assume, given, settings, strategies as st
 from pii_corpus import SAMPLES
 import pytest
 from test_credentials_flat import bare_walk_before_r1
+from test_credentials_refused import _LONG, _PW_NAME, _WITH_DIGITS
 
 from dagnam_contracts.hygiene import _backend, credentials, near_dedup, spans
 
@@ -96,6 +97,22 @@ def test_the_core_and_the_reference_find_the_same_spans(text: str) -> None:
     # (the reference corpus holds those texts, and the core's own gate holds it to them).
     assume(reference == _reference_spans(text, before_r1=True))
     assert [tuple(span) for span in core.findings(text)] == reference
+
+
+def test_the_pinned_core_has_not_learned_the_r1_fix_yet() -> None:
+    """The canary for two temporary adjustments: the ``assume`` above, and the reference-only
+    read of the texts the R1 fix changes in `test_corpus_credentials.py` (`_spans`).
+
+    `dagnam-core` 0.1.1 binds ``CORE_API`` 1 and reads a value an ambiguous name refuses
+    whole, so a password after it is missed. The day the pin moves to a core that has the
+    fix (0.2.0), this fails: delete the ``assume``, the ``before_r1`` argument of
+    `_reference_spans`, the reference-only branch of `_spans`, and this test, so that the
+    core is held to the reference on every text again.
+    """
+    text = f"token={_LONG}?{_PW_NAME}={_WITH_DIGITS}"
+    assert core.CORE_API == 1
+    assert [tuple(span) for span in core.findings(text)] == _reference_spans(text, before_r1=True)
+    assert _reference_spans(text) != _reference_spans(text, before_r1=True)
 
 
 def _chain(*parts: tuple[str, int, str]) -> str:

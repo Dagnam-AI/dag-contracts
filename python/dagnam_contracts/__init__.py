@@ -68,6 +68,7 @@ from dagnam_contracts.audit import (
 from dagnam_contracts.hygiene import (
     BANDS,
     DEFAULT_THRESHOLD,
+    MAX_COMPARISONS,
     MAX_PAIRS,
     MAX_TEXT_CHARS,
     MAX_TEXTS,
@@ -142,6 +143,7 @@ __all__ = [
     "FLOOR_LABEL",
     "LAYER_TYPE_TO_COMPONENT",
     "MAINTENANCE_USD_MONTH",
+    "MAX_COMPARISONS",
     "MAX_LINE_BYTES",
     "MAX_PAIRS",
     "MAX_TEXTS",

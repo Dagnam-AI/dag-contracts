@@ -259,20 +259,29 @@ _DIGIT = re.compile(r"\d")
 def _bare_assignments(text: str) -> list[tuple[str, int, int]]:
     """``(name, start, end)`` of every bare value that is a credential under its name.
 
-    A value an ambiguous name refuses is not skipped: the walk resumes right after that
-    name, so an assignment inside it (``token=<16+ characters>?password=...``) is judged
-    on its own. Every name inside a refused value reads the value's own end (the run's, or
-    the ``:`` that cut it), and the one verdict that needs the value, whether the rest of
-    it is high entropy, is read from `_entropy_starts`: so no character is judged twice.
+    Two values are never taken for one another. A value an ambiguous name refuses is not
+    skipped: the walk resumes right after that name, so an assignment inside it
+    (``token=<16+ characters>?password=...``) is judged on its own. And a value that is
+    taken does not hide a name in it either: the walk goes on right after the name, and
+    passes over only the names whose own value starts inside the one taken (a name whose
+    value starts after it, past a space or a quote, is a new assignment). Every name
+    inside a refused value reads the value's own end (the run's, or the ``:`` that cut
+    it), and the one verdict that needs the value, whether the rest of it is high
+    entropy, is read from `_entropy_starts`: a fixed number of passes over the value, not
+    one for each name in it.
     """
     found: list[tuple[str, int, int]] = []
     position = 0
+    taken_end = 0  # where the last credential taken ended
     run_end = -1  # the run of value characters containing `start`, once computed
     # The last value an ambiguous name refused: where it starts and ends, and the starts
     # inside it from which the rest of the value would be a credential on its own.
     refused_start, refused_end, vouching = 0, -1, range(0)
     while (head := _ASSIGNMENT_HEAD.search(text, position)) is not None:
         start = head.end()
+        position = head.start() + 1
+        if start < taken_end:
+            continue
         within_refused = refused_start <= start <= refused_end
         if within_refused:
             end = refused_end
@@ -285,7 +294,6 @@ def _bare_assignments(text: str) -> list[tuple[str, int, int]]:
                 colon = text.find(":", colon + 1, end)
             if colon != -1:
                 end = colon
-        position = head.start() + 1
         if not (end - start >= 16 or (end - start >= 6 and _DIGIT.search(text, start, end))):
             continue
         name = head["n"]
@@ -300,7 +308,7 @@ def _bare_assignments(text: str) -> list[tuple[str, int, int]]:
                 vouching = _entropy_starts(text, start, end)
         if credential:
             found.append((name, start, end))
-            position = end
+            taken_end = end
     return found
 
 
