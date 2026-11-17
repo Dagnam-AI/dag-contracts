@@ -1,7 +1,7 @@
 [project]
 name = "dagnam-contracts"
 version = "0.7.0"
-description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a dependency-free interpreter."
+description = "Canonical component/parameter validation contract for Dagnam.AI — schema plus a plain-Python interpreter, with a compiled core for speed."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"
@@ -12,6 +12,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
 

@@ -21,7 +21,7 @@ thing to re-run before revisiting the choice. What it showed:
   (`PII_SECRET`, whose finder and precision rules live in `credentials.py`);
 * presidio's advantage is entity types this scan does not claim (person
   names, addresses, locations), which need a NER model — i.e. an ML
-  dependency, which this deliberately dependency-free package cannot carry;
+  dependency, which this package (plain Python, one compiled dependency) does not take on;
 * an auditable rule the user can read beats a black box for a feature whose
   whole framing is "best effort, here is what we looked for".
 

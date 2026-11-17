@@ -17,7 +17,8 @@ MAX_TOTAL_CHARS = 20_000_000
 compared."""
 
 MAX_COMPARISONS = 40_000_000
-"""The most candidate pairs the Python walk compares (see the module docstring).
+"""The most candidate pairs the walk compares, in Python and in the core (see the
+`near_dedup` module docstring).
 
 A candidate pair is two rows that share an LSH band, counted once however many bands they
 share, whether or not it turns out to be a near-duplicate. The call raises

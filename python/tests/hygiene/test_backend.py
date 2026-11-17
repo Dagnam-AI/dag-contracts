@@ -21,8 +21,9 @@ from typing import Any, cast
 
 import pytest
 
-from dagnam_contracts.hygiene import _backend, _limits, backend
+from dagnam_contracts.hygiene import _backend, _limits, backend, near_dedup
 from dagnam_contracts.hygiene.near_dedup import (
+    MAX_PAIRS,
     NUM_PERMUTATIONS,
     NearDedupLimitError,
     NearDedupResult,
@@ -295,6 +296,26 @@ def test_the_cores_limit_error_is_this_packages_with_the_same_message(
         compute_near_duplicates([{"t": "a b c"}] * 2)
     assert type(raised.value) is NearDedupLimitError
     assert str(raised.value) == "more than MAX_PAIRS (20000000) near-duplicate pairs"
+
+
+def test_the_real_cores_limit_error_is_this_packages_with_the_same_words(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Against the actual binary, on whichever backend the suite runs. A batch over the pair
+    limit is refused by the core's counting walk before anything is allocated (about 0.6 s and
+    37 MB), so the limit path needs no 1.5 GB result."""
+    core = pytest.importorskip("dagnam_core.hygiene")
+    if not _backend._usable(core):
+        pytest.skip("the installed core is not one this release uses (e.g. no tables)")
+    with pytest.raises(NearDedupLimitError) as python:
+        near_dedup._check_pairs(MAX_PAIRS + 1)
+
+    monkeypatch.setattr(_backend, "active", lambda: core)
+    with pytest.raises(NearDedupLimitError) as compiled:
+        # n identical rows have n * (n - 1) / 2 pairs: 6,326 of them have 20,004,475.
+        compute_near_duplicates([{"t": "a b c"}] * 6326)
+    assert type(compiled.value) is NearDedupLimitError
+    assert str(compiled.value) == str(python.value)
 
 
 def test_an_error_of_the_core_that_is_not_its_limit_is_not_turned_into_one(

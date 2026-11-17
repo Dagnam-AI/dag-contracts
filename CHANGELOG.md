@@ -86,7 +86,12 @@ before 0.4.0 are described in `README.md`.
   against 1,539 on 3.12 and 1,814 against 1,542 on 3.14. On 3.14 the compiled path peaks
   above the Python one by the size of the core's own result (a 3-tuple is 72 bytes there, a
   `NearDuplicatePair` 56), which is what the core alone peaks at, so it is the core's to
-  trim, not this package's.
+  trim, not this package's: a compact result type is planned in `dagnam-core`. The worst case
+  stays under the documented bound of about 2 GiB, the compiled path is the faster one
+  (1.3 s against 19 s at 3,000 identical texts), and `DAGNAM_CONTRACTS_PURE=1` selects the
+  reference.
+- `dagnam` (the SDK) and the platform backend cap `dagnam-contracts` below 0.6, so they are
+  unaffected by this release until they lift the cap.
 - The core's tables follow the interpreter's Unicode version, so the differential test now
   draws every code point (it used to leave out those assigned after Unicode 3.2) and ran at
   50,000 examples on CPython 3.12, 3.13 and 3.14 with no difference. The two temporary

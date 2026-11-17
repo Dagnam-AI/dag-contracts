@@ -7,8 +7,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  # A daily run on main: the compiled core is a default dependency now, and a release of it, or
-  # of an interpreter, that breaks a platform shows up here the day it happens.
+  # A daily run on main: the compiled core is a default dependency now. The core is pinned
+  # exactly, so a new core release never reaches this workflow; what the daily run catches is a
+  # change of the interpreters, the runner images or PyPI's wheels for the pinned core.
   schedule:
     - cron: "17 5 * * *"
   # The release workflow calls this file, so a tag cannot publish a commit
@@ -18,6 +19,10 @@ on:
 # Least privilege: no job here writes to the repository.
 permissions:
   contents: read
+
+env:
+  # The version of uv the wheel and install jobs use, the one dag-core's workflows pin.
+  UV_VERSION: "0.13.6"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -146,6 +151,9 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
 
       - name: Build
         working-directory: python
@@ -196,6 +204,10 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          # No cache: the core must be resolved from PyPI fresh, as a user's install is.
+          enable-cache: false
 
       - name: Install the wheel into a clean environment and use it
         run: |

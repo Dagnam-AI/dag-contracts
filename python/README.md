@@ -1,7 +1,8 @@
 # dagnam-contracts
 
 The canonical component/parameter validation contract for [Dagnam.AI](https://dagnam.ai)
-— the generated component schema plus a **dependency-free** interpreter of it.
+— the generated component schema plus a plain-Python interpreter of it, with the
+compiled `dagnam-core` as its one dependency.
 
 An architecture is validated in three places: the platform backend when a project
 is saved, the `dagnam` SDK before a job is submitted, and the Studio as nodes are
@@ -21,15 +22,22 @@ for e in errors:
 # convolution-layer: missing required parameter 'kernelSize'
 ```
 
-## Zero dependencies, by design
+## One dependency, by design
 
-This package installs nothing else. That is a constraint rather than a
-coincidence: the `dagnam` SDK ships with only `requests` and `numpy`, so a
-contract package it depends on must add nothing.
+The interpreter, the hygiene functions and every other module are plain Python with no
+third-party imports, and they are the reference: they run everywhere. Since 0.7.0 the
+package depends on exactly one thing, the compiled [`dagnam-core`](https://pypi.org/project/dagnam-core/),
+pinned to one version, which runs the dataset-hygiene hot paths faster (see
+[The compiled core](#the-compiled-core)). On a platform or interpreter without a native
+wheel of the core, pip installs its stub instead, and the Python in this package runs, so
+the install never needs a compiler and the answers do not change. Nothing else is installed:
+the `dagnam` SDK ships with only `requests` and `numpy`, so a contract package it depends
+on must stay light.
 
-It is why the Pydantic registry that *authors* the schema stays out of the
-distribution — the wheel carries generated JSON and a plain-Python interpreter of
-it, and the typed authoring format lives in the repository instead.
+It is also why the Pydantic registry that *authors* the schema stays out of the
+distribution: the wheel carries generated JSON and a plain-Python interpreter of
+it, and the typed authoring format lives in the repository instead. The npm package,
+`@dagnam/contracts`, is separate and has no dependencies at all.
 
 ## Dataset hygiene and prompt rendering
 
@@ -38,7 +46,8 @@ platform and the `dagnam` SDK share — so a redaction, a dedup pass or a
 contamination check reaches the same verdict wherever it runs — and the one
 function that renders a chat request as classifier input text, so the text a
 classifier saw in training is byte-for-byte the text it sees when served.
-Results are frozen dataclasses; everything is standard library only.
+Results are frozen dataclasses; the Python is standard library only, and the compiled
+core runs the same functions faster when it is in use.
 
 ```python
 from dagnam_contracts import (
@@ -175,6 +184,15 @@ before any work and before the compiled core is called; the last two are enforce
 Python path, and by the core before it allocates, which raises the same
 `NearDedupLimitError` with the same message. A dataset in which a very large
 share of the rows is one repeated text should go through `compute_exact_duplicates` first.
+
+The compiled path's memory, measured (peak resident set of a fresh process, MB, compiled
+against Python): 3,000 identical texts 365 against 381 on CPython 3.12 and 437 against 383
+on 3.14; exactly `MAX_PAIRS` pairs 1,492 against 1,539 on 3.12 and 1,814 against 1,542 on
+3.14. It is at or below the Python path on 3.12 and 3.13 and about 14% and 18% above it on
+3.14, because the core returns each pair as a 3-tuple (72 bytes on 3.14 against 56 for a
+`NearDuplicatePair`). The worst case stays under the bound of about 2 GiB; a compact result
+type is planned in `dagnam-core`. The compiled path is the faster one (about 1.3 s against
+19 s at 3,000 identical texts), and `DAGNAM_CONTRACTS_PURE=1` selects the reference.
 
 ## Versioning
 

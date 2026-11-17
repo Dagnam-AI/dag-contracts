@@ -67,8 +67,16 @@ Design, and why each piece is what it is:
   comparison and a pair limit can all be reached by one batch: the longest is
   `MAX_TOTAL_CHARS` of text and `MAX_COMPARISONS` comparisons, about five minutes, and the
   most memory about 2 GiB. The result is a list of pairs, not a count, so a caller that
-  needs a bounded answer for a bigger batch must cluster the identical texts first. The
-  compiled path peaks no higher than the Python one (see the changelog for the numbers).
+  needs a bounded answer for a bigger batch must cluster the identical texts first.
+* **The compiled path's memory, measured** (peak resident set in a fresh process, MB,
+  compiled against Python): 3,000 identical texts 365 against 381 on CPython 3.12 and 437
+  against 383 on 3.14; exactly `MAX_PAIRS` pairs 1,492 against 1,539 on 3.12 and 1,814
+  against 1,542 on 3.14. So it is at or below the Python path on 3.12 and 3.13 and about 14%
+  and 18% above it on 3.14, because the core returns each pair as a 3-tuple, which costs
+  72 bytes there against 56 for a `NearDuplicatePair`; the wrapper adds nothing to that. The
+  worst case stays under the bound above (about 2 GiB). A compact result type is planned in
+  `dagnam-core`. The compiled path is the faster one (about 1.3 s against 19 s at 3,000
+  identical texts) and `DAGNAM_CONTRACTS_PURE=1` selects the reference.
 
 Pure — no session, no I/O.
 """
@@ -348,7 +356,7 @@ def compute_near_duplicates(
             raise NearDedupLimitError(str(error)) from None  # one public type, the same message
         # Each tuple the core made is replaced by its pair in the list the core returned,
         # so a tuple is freed as its pair is built: the two never exist together, and the
-        # result peaks no higher than the core's own list did (a second list of pairs beside
+        # result adds nothing to the core's own peak (a second list of pairs beside
         # it added 300 MB at 3,000 identical rows and 1.4 GB at `MAX_PAIRS`). The core shares
         # one int per row and one float per distinct similarity; the pairs keep them.
         for index, (kept, duplicate, similarity) in enumerate(found):

@@ -51,8 +51,8 @@ def _usable(core: Any) -> bool:
 
 
 _core: Any = None
-# The one optional import in the package: the compiled core has no wheel on some
-# platforms, and the Python below is the reference that runs there.
+# The one optional import in the package: on a platform with no native wheel the core is a
+# stub whose `hygiene` fails to import, and the Python below is the reference that runs there.
 if os.environ.get("DAGNAM_CONTRACTS_PURE", "").strip().lower() in _OFF:
     try:
         from dagnam_core import hygiene as _core
