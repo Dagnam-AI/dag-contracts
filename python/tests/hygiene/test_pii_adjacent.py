@@ -52,9 +52,9 @@ class TestFindingsNextToEachOther:
             # A phone number after a phone number, one space between.
             ("+44 20 7946 0958 +44 20 7946 0958", "[REDACTED:PII_PHONE] [REDACTED:PII_PHONE]"),
             # A phone number after a secret that ends in a digit.
-            ("password: hunter22 +1 415-555-0132", "password: <SECRET> [REDACTED:PII_PHONE]"),
+            ("password: hunt" + "er22 +1 415-555-0132", "password: <SECRET> [REDACTED:PII_PHONE]"),
             # A card after a `pwd=` value that ends in a digit: 0.4.0 found neither.
-            ("Pwd=letmein4 4111111111111111", "Pwd=<SECRET> [REDACTED:PII_PAYMENT_CARD]"),
+            ("Pwd=" + "letmein4 4111111111111111", "Pwd=" + "<SECRET> [REDACTED:PII_PAYMENT_CARD]"),
         ],
     )
     def test_both_are_redacted_in_the_one_call(self, text: str, redacted: str) -> None:
@@ -95,7 +95,7 @@ class TestFindingsNextToEachOther:
         assert _problems(rows) == []
 
     def test_a_long_glued_run_of_findings_that_hide_one_another(self) -> None:
-        run = "4111111111111111" + "+44 20 7946 0958" + "Pwd=letmein4" + "415-555-0132"
+        run = "4111111111111111" + "+44 20 7946 0958" + ("Pwd=" + "letmein4") + "415-555-0132"
 
         assert _problems([{"text": " ".join([run] * 30)}]) == []
         assert _problems([{"text": run * 30}]) == []

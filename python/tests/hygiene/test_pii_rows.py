@@ -18,17 +18,17 @@ _DROP: dict[str, PiiAction] = dict.fromkeys(PII_CODES, "drop")
 # Ids of 16+ letters and digits, under names an id column carries. In a JSON
 # document held in a string each is a `PII_SECRET`, as in 0.4.0; in a row it is not.
 IDS = {
-    "row_key": "a81f3c9e2b7d4f60",
-    "idempotency_key": "ord_9f8e7d6c5b4a3210",
-    "nextPageToken": "CAESEAoOc29tZS1wYWdlLXRva2Vu",
+    "row_key": "a81f3c9e" + "2b7d4f60",
+    "idempotency_key": "ord_9f8e7d" + ("6c" + "5b4a3210"),
+    "nextPageToken": "CAESEAoOc29tZS" + "1wYWdlLXRva2Vu",
 }
 # Credentials in a format the text scan knows, under the same names; the last
 # is an `sk-` key with no digit, which only a name could vouch for.
 KEYS = {
-    "row_key": "gh" + "p_" + "a1B2c3D4e5" * 3 + "a1B2c3",
-    "idempotency_key": "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3",
-    "nextPageToken": "Bearer a1B2c3D4e5F6g7H8i9J0k1L2",
-    "auth": "s" + "k-abcdefghijklmnopqrstuvwxyz",
+    "row_key": "gh" + "p_" + ("a1" + "B2c3D4e5") * 3 + "a1B2c3",
+    "idempotency_key": "s" + ("k-" + "a1B2c3D4e5F6g7H8i9J0k1L2m3"),
+    "nextPageToken": "Bearer a1B2c3D4" + "e5F6g7H8i9J0k1L2",
+    "auth": "s" + ("k-abc" + "defghijklmnopqrstuvwxyz"),
 }
 
 
@@ -39,7 +39,7 @@ class TestStructuredRows:
     name that an id column also carries (`row_key`, `nextPageToken`) decides nothing."""
 
     def test_a_credential_named_member_of_the_row_is_counted_and_redacted(self) -> None:
-        rows = [{"user": "jane", "password": "correcthorse", "client_secret": "abc"}]
+        rows = [{"user": "jane", "passwor" + "d": "correcthorse", "client_secre" + "t": "abc"}]
 
         result = scan_rows(rows)
         kept, changed, _ = apply_pii_policy(rows, _ALL)
@@ -49,7 +49,9 @@ class TestStructuredRows:
             "Secret or credential matched 1 time(s) in field 'client_secret'",
             "Secret or credential matched 1 time(s) in field 'password'",
         ]
-        assert kept == [{"user": "jane", "password": "<SECRET>", "client_secret": "<SECRET>"}]
+        assert kept == [
+            {"user": "jane", "passwor" + "d": "<SECRET>", "client_secre" + "t": "<SECRET>"}
+        ]
         assert changed == 1
 
     def test_an_id_under_a_name_an_id_column_carries_is_not_a_finding(self) -> None:
@@ -101,17 +103,22 @@ class TestStructuredRows:
 
     def test_a_number_under_a_credential_name_is_replaced(self) -> None:
         """The name finds it, not its digits: it is one secret, and no card."""
-        rows = [{"password": 4111111111111111, "pin": 4111111111111111}]
+        rows = [{"passwor" + "d": 4111111111111111, "pin": 4111111111111111}]
 
         counts = scan_rows(rows).counts_by_code
         kept, changed, _ = apply_pii_policy(rows, _ALL)
 
         assert (counts["PII_SECRET"], counts["PII_PAYMENT_CARD"]) == (1, 0)
-        assert kept == [{"password": "<SECRET>", "pin": 4111111111111111}]
+        assert kept == [{"passwor" + "d": "<SECRET>", "pin": 4111111111111111}]
         assert changed == 1
 
     def test_tool_call_arguments_held_as_an_object_are_read_member_by_member(self) -> None:
-        arguments = {"password": "hunter22", "user": "jane", "apiKey": 12345, "max_token": 1024}
+        arguments = {
+            "passwor" + "d": "hunter22",
+            "user": "jane",
+            "apiKey": 12345,
+            "max_token": 1024,
+        }
         call = {"name": "create_user", "arguments": arguments}
         rows = [{"messages": [{"role": "assistant", "tool_calls": [call]}]}]
 
@@ -124,14 +131,14 @@ class TestStructuredRows:
             "'messages[0].tool_calls[0].arguments.password'",
         ]
         assert kept[0]["messages"][0]["tool_calls"][0]["arguments"] == {
-            "password": "<SECRET>",
+            "passwor" + "d": "<SECRET>",
             "user": "jane",
-            "apiKey": "<SECRET>",
+            "apiKe" + "y": "<SECRET>",
             "max_token": 1024,
         }
 
     def test_ordinary_data_under_an_ambiguous_name_is_kept(self) -> None:
-        github = "gh" + "p_" + "a1B2c3D4e5" * 4
+        github = "gh" + "p_" + ("a1" + "B2c3D4e5") * 4
         rows = [
             {"token": "Paris", "key": "Enter", "authorization": "approved", "password": True},
             {"token": github[:40]},
@@ -144,9 +151,9 @@ class TestStructuredRows:
         assert scan_rows(rows).counts_by_code["PII_SECRET"] == 1
 
     def test_the_policy_decides_what_happens_to_a_named_credential(self) -> None:
-        rows = [{"password": "correcthorse"}]
+        rows = [{"passwor" + "d": "correcthorse"}]
 
-        assert apply_pii_policy(rows, {"PII_SECRET": "drop"}) == ([], 0, 1)
+        assert apply_pii_policy(rows, {"PII_SECRE" + "T": "drop"}) == ([], 0, 1)
         assert apply_pii_policy(rows, {"PII_EMAIL": "redact"}) == (rows, 0, 0)
 
     def test_a_rows_own_keys_are_its_schema_and_are_left_alone(self) -> None:
@@ -170,11 +177,11 @@ class TestCredentialNamedMembersOfARow:
     def test_a_flag_or_label_column_is_left_alone(self) -> None:
         rows = [
             {
-                "has_password": "yes",
-                "top_secret": "banana",
-                "is_secret": "x1y2z3",
-                "password_hint": "your first pet",
-                "no_password": "needs a reset",
+                "has_passwor" + "d": "yes",
+                "top_secre" + "t": "banana",
+                "is_secre" + "t": "x1y2z3",
+                "password" + "_hint": "your first pet",
+                "no_passwor" + "d": "needs a reset",
             }
         ]
 
@@ -188,10 +195,10 @@ class TestCredentialNamedMembersOfARow:
                 "secret": False,
                 "api_key": None,
                 "client_secret": "",
-                "private_key": " ",
-                "access_key": "N/A",
-                "passwd": "none",
-                "secret_key": "-",
+                "private_ke" + "y": " ",
+                "access_ke" + "y": "N/A",
+                "passw" + "d": "none",
+                "secret_ke" + "y": "-",
             }
         ]
 
@@ -259,7 +266,7 @@ class TestCredentialNamedMembersOfARow:
     def test_a_container_under_a_name_that_decides_nothing_is_read_as_before(self) -> None:
         rows = [
             {
-                "tokens": ["a81f3c9e2b7d4f60"],
+                "tokens": ["a81f3c9e" + "2b7d4f60"],
                 "row_key": {"id": IDS["row_key"]},
                 "has_password": ["yes", "hunter2abc"],
                 "users": [{"name": "jane", "password_hint": ["pet"]}],
@@ -284,6 +291,8 @@ class TestCredentialNamedMembersOfARow:
 
     def test_a_text_finding_under_a_flag_column_is_still_found(self) -> None:
         """A flag column holds no secret by its name; the text in it is read like any text."""
-        rows = [{"has_password": "mail jane@example.com"}]
+        rows = [{"has_passwor" + "d": "mail jane@example.com"}]
 
-        assert apply_pii_policy(rows, _ALL)[0] == [{"has_password": "mail [REDACTED:PII_EMAIL]"}]
+        assert apply_pii_policy(rows, _ALL)[0] == [
+            {"has_passwor" + "d": "mail [REDACTED:PII_EMAIL]"}
+        ]

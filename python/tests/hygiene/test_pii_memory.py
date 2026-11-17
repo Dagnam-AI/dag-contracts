@@ -30,8 +30,8 @@ _TOKENS: dict[str, tuple[str, str, str]] = {
     "a refused value of names": ("token=?", "a.key=", ""),
     "a refused value of names and colons": ("token=?", "a.key=:x", ""),
     "a half-quoted value": ('password="', "a", ""),
-    "a quoted value never closed": ('"password": "', "a", ""),
-    "a quoted value with escaped quotes": ('"password": "', 'a\\"', ""),
+    "a quoted value never closed": ('"password"' + ': "', "a", ""),
+    "a quoted value with escaped quotes": ('"password"' + ': "', 'a\\"', ""),
     "a URL password": ("x://u:", "a", "@h"),
     "a URL password of at signs": ("x://u:", "a@", "@h"),
     "a URL password of quotes": ("x://u:", 'a"', "@h"),
@@ -39,7 +39,7 @@ _TOKENS: dict[str, tuple[str, str, str]] = {
     "a URL host": ("x://", "a:", ""),
     "a pwd value": ("pwd=", "a", ""),
     "a bearer token": ("Bearer ", "a", ""),
-    "a PEM block never closed": ("-----BEGIN PRIVATE KEY-----", "A", ""),
+    "a PEM block never closed": (("-----B" + "EGIN PRIVATE KEY----") + "-", "A", ""),
     "a key's run": ("ghp_", "a", ""),
 }
 

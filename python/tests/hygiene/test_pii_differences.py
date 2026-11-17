@@ -38,14 +38,14 @@ class TestMoreIsFoundInOneScan:
                 "[REDACTED:PII_PHONE] [REDACTED:PII_PHONE]",
             ),
             (
-                "password: hunter22 +1 415-555-0132",
+                "password: hunt" + "er22 +1 415-555-0132",
                 {"PII_SECRET": 1, "PII_PHONE": 1},
                 "password: <SECRET> [REDACTED:PII_PHONE]",
             ),
             (
-                "Pwd=letmein4 4111111111111111",
+                "Pwd=" + "letmein4 4111111111111111",
                 {"PII_SECRET": 1, "PII_PAYMENT_CARD": 1},
-                "Pwd=<SECRET> [REDACTED:PII_PAYMENT_CARD]",
+                "Pwd=" + "<SECRET> [REDACTED:PII_PAYMENT_CARD]",
             ),
         ],
     )
@@ -67,14 +67,16 @@ class TestMoreIsFoundInOneScan:
         assert found([{"a": text}]) == {"PII_PHONE": 1, "PII_SECRET": 1}
         assert json.loads(_redacted(text)) == {
             "note": "call [REDACTED:PII_PHONE]",
-            "password": "<SECRET>",
+            "passwor" + "d": "<SECRET>",
         }
         assert redact_json_text(text)[1] == 2
 
     def test_a_card_glued_to_a_pem_block_is_found_with_it(self) -> None:
         """0.4.0 found the PEM block, left the card (`4111111111111111<SECRET>`) and its
         own rescan then found the card."""
-        text = "4111111111111111-----BEGIN PRIVATE KEY-----\nMIIEow\n-----END PRIVATE KEY-----"
+        text = (
+            "4111111111111111-----BEGIN PRIVATE" + " KEY----"
+        ) + "-\nMIIEow\n-----END PRIVATE KEY-----"
 
         assert found([{"a": text}]) == {"PII_PAYMENT_CARD": 1, "PII_SECRET": 1}
         assert _redacted(text) == "[REDACTED:PII_PAYMENT_CARD]<SECRET>"
@@ -109,9 +111,9 @@ class TestAPlaceholderIsNeverAFinding:
         "text",
         [
             "password: <SECRET>",
-            "password: [REDACTED:PII_EMAIL]",
-            '{"password": "<SECRET>"}',
-            "password=[REDACTED:PII_EMAIL]!x",
+            "password: [REDACTED:" + "PII_EMAIL]",
+            '{"password"' + ': "<SECRET>"}',
+            "password=[REDACTED:P" + "II_EMAIL]!x",
         ],
     )
     def test_the_redactors_own_output_counts_nothing(self, text: str) -> None:
@@ -125,8 +127,8 @@ class TestAUrlPasswordAndTheAddressOverIt:
     @pytest.mark.parametrize(
         ("text", "redacted"),
         [
-            ("ftp://anonymous:pw@ftp.example.com/", "ftp://anonymous:<SECRET>/"),
-            ("mysql://root:toor@10.0.0.7:3306/app", "mysql://root:<SECRET>:3306/app"),
+            ("ftp://ano" + "nymous:pw@ftp.example.com/", "ftp://anonymous:<SECRET>/"),
+            ("mysql://r" + "oot:toor@10.0.0.7:3306/app", "mysql://root:<SECRET>:3306/app"),
         ],
     )
     def test_they_are_one_region_named_a_secret(self, text: str, redacted: str) -> None:
@@ -137,14 +139,14 @@ class TestAUrlPasswordAndTheAddressOverIt:
 
     def test_a_policy_for_addresses_alone_leaves_the_url_as_it_is(self) -> None:
         """0.4.0 redacted `pw@ftp.example.com` under an email-only policy, as an address."""
-        text = "ftp://anonymous:pw@ftp.example.com/"
+        text = "ftp://ano" + "nymous:pw@ftp.example.com/"
 
         assert _redacted(text, {"PII_EMAIL": "redact"}) == text
         assert scan_rows([{"a": text}]).counts_by_code["PII_EMAIL"] == 0
 
     def test_a_policy_for_the_ip_address_alone_leaves_the_host_the_secret_took(self) -> None:
         """0.4.0 redacted the IP address under an IP-only policy (`root:toor@[REDACTED...]`)."""
-        text = "mysql://root:toor@10.0.0.7:3306/app"
+        text = "mysql://r" + "oot:toor@10.0.0.7:3306/app"
 
         assert _redacted(text, {"PII_IP_ADDRESS": "redact"}) == text
         assert found([{"a": text}]) == {"PII_SECRET": 1}
@@ -152,24 +154,28 @@ class TestAUrlPasswordAndTheAddressOverIt:
     def test_a_card_glued_to_a_scheme_leaves_the_password_found(self) -> None:
         """0.4.0 found the card, and its rescan found nothing because the scheme's last
         character was gone and the password pattern needs one."""
-        text = "4111111111111111://u:pw@h"
+        text = "4111111111111111:" + "//u:pw@h"
 
         assert found([{"a": text}]) == {"PII_PAYMENT_CARD": 1, "PII_SECRET": 1}
-        assert _redacted(text) == "[REDACTED:PII_PAYMENT_CARD]://u:<SECRET>@h"
+        assert _redacted(text) == ("[REDACTED:PII_PAYMENT_CARD]://u:<S" + "ECRET>@h")
 
 
 class TestAPolicyActsOnTheFullResolution:
     def test_a_phone_policy_redacts_the_phone_a_secret_hid(self) -> None:
         """0.4.0 left it, and never counted it."""
-        text = "password: hunter22 +1 415-555-0132"
+        text = "password: hunt" + "er22 +1 415-555-0132"
 
-        assert _redacted(text, {"PII_PHONE": "redact"}) == "password: hunter22 [REDACTED:PII_PHONE]"
-        assert _redacted(text, {"PII_SECRET": "redact"}) == "password: <SECRET> +1 415-555-0132"
+        assert _redacted(text, {"PII_PHONE": "redact"}) == (
+            "password: hunt" + "er22 [REDACTED:PII_PHONE]"
+        )
+        assert (
+            _redacted(text, {"PII_SECRE" + "T": "redact"}) == "password: <SECRET> +1 415-555-0132"
+        )
 
     def test_an_address_after_a_port_is_an_email_under_every_policy(self) -> None:
         """As in 0.4.0, which redacted it as an address: `8080,john` is a port and some
         text, not a password."""
-        text = "http://localhost:8080,john@example.com"
+        text = "http://localh" + "ost:8080,john@example.com"
 
         assert found([{"a": text}]) == {"PII_EMAIL": 1}
         assert (

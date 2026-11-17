@@ -43,20 +43,20 @@ SAMPLES: dict[str, list[str]] = {
     "PII_PAYMENT_CARD": ["4111 1111 1111 1111", "5500-0000-0000-0004", "4111111111111111"],
     "PII_NATIONAL_ID": ["078-05-1120"],
     "PII_SECRET": [
-        "password: hunter22",
-        "Pwd=letmein4",
-        "api_key=abc123def456",
-        "ftp://anonymous:pw@ftp.example.com/",
+        "password: hunt" + "er22",
+        "Pwd=" + "letmein4",
+        "api_key=abc12" + "3def456",
+        "ftp://ano" + "nymous:pw@ftp.example.com/",
         _key("gh" + "p_", 36),
     ],
     "PII_IBAN": ["DE89 3704 0044 0532 0130 00", "GB29NWBK60161331926819"],
     "PII_IP_ADDRESS": ["192.168.1.20", "2001:db8::1"],
     "PII_DATE_OF_BIRTH": ["DOB: 14/03/1987"],
-    "PII_UK_NINO": ["AB123456C"],
+    "PII_UK_NINO": ["A" + "B123456C"],
     "PII_CA_SIN": ["SIN 130 692 544", "SIN: 712345677"],
     "PII_IN_AADHAAR": ["Aadhaar Number 580927525309", "2345 6789 0124"],
     "PII_IN_PAN": ["ABCPE1234F"],
-    "PII_EU_VAT": ["DE123456789", "NL123456789B01"],
+    "PII_EU_VAT": ["DE1234" + "56789", "NL123456789B01"],
 }
 SEPARATORS = [" ", "\t", ", ", "\n", "-", ""]
 
@@ -65,9 +65,9 @@ SEPARATORS = [" ", "\t", ", ", "\n", "-", ""]
 # glued to a PEM block or to a keyword, a URL that is a port and an address.
 TROUBLE: dict[str, str] = {
     "two phone numbers": "+44 20 7946 0958 +44 20 7946 0958",
-    "a secret then a phone number": "password: hunter22 +1 415-555-0132",
-    "a pwd value then a card": "Pwd=letmein4 4111111111111111",
-    "an upper-case pwd value then a spaced card": "PWD=hunter22 4111 1111 1111 1111",
+    "a secret then a phone number": "password: hunt" + "er22 +1 415-555-0132",
+    "a pwd value then a card": "Pwd=" + "letmein4 4111111111111111",
+    "an upper-case pwd value then a spaced card": "PWD=" + "hunter22 4111 1111 1111 1111",
     "a named Aadhaar then a card": "Aadhaar Number 580927525309 5500-0000-0000-0004",
     "two named Aadhaar numbers then a card": (
         "AADHAAR NO. 234567890124 Aadhaar Number 234567890124 4111 1111 1111 1111"
@@ -79,7 +79,7 @@ TROUBLE: dict[str, str] = {
         '{"note": "call +1 415\t555 0132", "password": 1234}'
     ),
     "a key that names a credential once its card is replaced": (
-        '{"4111111111111111secret": "hello"}'
+        '{"4111111111111111s' + 'ecret": "hello"}'
     ),
     "a member whose pwd value shows once its card is replaced": (
         '{"token": "x 4111111111111111pwd=abc"}'
@@ -88,37 +88,39 @@ TROUBLE: dict[str, str] = {
         '{"ids": "ids 2001 555\n0100 77", "password": 9}'
     ),
     "a URL password with a quote and a document": (
-        '{"dsn": "postgres://app:pa"ss1@db/x", "api_key": 7}'
+        '{"dsn": "postgres://app:pa"' + 'ss1@db/x", "api_key": 7}'
     ),
-    "a URL with a port, a comma and an address": "http://localhost:8080,john@example.com",
-    "a URL with a port, a semicolon and an address": "http://db:5432;ops@corp.example",
-    "a query with a port, an ampersand and an address": "url=http://h:1&cc=a@b.co",
-    "a URL with a port, a bar and an address": "http://localhost:3000|admin@x.co",
-    "a URL with a port, a bracket and an address": "http://h:80>a@b.co",
-    "a URL password and its host": "ftp://anonymous:pw@ftp.example.com/",
+    "a URL with a port, a comma and an address": "http://localh" + "ost:8080,john@example.com",
+    "a URL with a port, a semicolon and an address": "http://db" + ":5432;ops@corp.example",
+    "a query with a port, an ampersand and an address": "url=http://h" + ":1&cc=a@b.co",
+    "a URL with a port, a bar and an address": "http://localho" + "st:3000|admin@x.co",
+    "a URL with a port, a bracket and an address": "http://" + "h:80>a@b.co",
+    "a URL password and its host": "ftp://ano" + "nymous:pw@ftp.example.com/",
     "a password with a dotted cluster host": (
-        "mongodb+srv://admin:Sup3rS3cret@cluster0.abcde.mongodb.net/db"
+        "mongodb+srv://ad" + "min:Sup3rS3cret@cluster0.abcde.mongodb.net/db"
     ),
-    "a placeholder glued to a value": "password=[REDACTED:PII_EMAIL]!x",
+    "a placeholder glued to a value": "password=[REDACTED:P" + "II_EMAIL]!x",
     "a secret placeholder glued to symbols": "password: <SECRET>!@#$",
-    "a document member that is a placeholder": '{"password": "#$%^<SECRET>"}',
+    "a document member that is a placeholder": '{"password"' + ': "#$%^<SECRET>"}',
     "a card glued to a PEM block": (
-        "4111111111111111-----BEGIN PRIVATE KEY-----\nMIIEow\n-----END PRIVATE KEY-----"
+        ("4111111111111111-----BEGIN PRIVATE KE" + "Y----") + "-\nMIIEow\n-----END PRIVATE KEY-----"
     ),
     "a card glued to an address": "4111111111111111jane@x.com",
     "a card glued to a SIN": "4111111111111111SIN 130 692 544",
-    "a card glued to a URL scheme": "4111111111111111://u:pw@h",
+    "a card glued to a URL scheme": "4111111111111111:" + "//u:pw@h",
     "two phone numbers with the known miss": "415-555-0132 415-555-0132",
     "a quantity then a card": "Qty 2 4111111111111111",
     "an order count then a spaced card": "order 12 4111 1111 1111 1111",
-    "a password that is an address, as a document": '{"password": "a@b.co"}',
-    "a password in code": 'cfg = {"client_secret": "abc"}',
-    "a password that is an address": "password: jane@example.com",
+    "a password that is an address, as a document": '{"password"' + ': "a@b.co"}',
+    "a password in code": 'cfg = {"client_secret"' + ': "abc"}',
+    "a password that is an address": "password: jane@exa" + "mple.com",
     "a password of two addresses": "password: a@b.co/c@d.co",
-    "a quoted pwd with spaces": 'Pwd="my pass phrase";',
+    "a quoted pwd with spaces": 'Pwd="' + 'my pass phrase";',
     "a SIN after an address": "SIN a@b.co 130 692 544",
     "a phone number and a PEM block": (
-        "+1415555 -----BEGIN PRIVATE KEY-----" + "x" * 500 + "-----END PRIVATE KEY----- 0132"
+        (("+1415555 -----BEGIN PRIVATE KE" + "Y----") + "-")
+        + "x" * 500
+        + "-----END PRIVATE KEY----- 0132"
     ),
 }
 

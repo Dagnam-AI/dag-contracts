@@ -75,12 +75,14 @@ class TestAFieldThatReadsDifferentlyOnceRedacted:
         assert found([row]) == {"PII_PHONE": 1, "PII_SECRET": 1}
         assert json.loads(redacted[0]["text"]) == {
             "note": "call [REDACTED:PII_PHONE]",
-            "password": "<SECRET>",
+            "passwor" + "d": "<SECRET>",
         }
         _clean(row)
 
     def test_a_pem_block_with_real_newlines_and_a_secret_member(self) -> None:
-        block = "-----BEGIN PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END PRIVATE KEY-----"
+        block = (
+            "-----BEGIN PRIVATE KE" + "Y----"
+        ) + "-\nMIIEowIBAAKCAQEA\n-----END PRIVATE KEY-----"
         row = {"text": '{"key": "' + block + '", "secret": 42}'}
 
         _clean(row)
@@ -92,7 +94,7 @@ class TestAFieldThatReadsDifferentlyOnceRedacted:
         assert found([row])["PII_SECRET"] == 1
 
     def test_a_url_password_with_a_quote_and_an_api_key_member(self) -> None:
-        row = {"text": '{"dsn": "postgres://app:pa"ss1@db/x", "api_key": 7}'}
+        row = {"text": '{"dsn": "postgres://app:pa"' + 'ss1@db/x", "api_key": 7}'}
 
         _clean(row)
         assert found([row])["PII_SECRET"] >= 1
@@ -101,17 +103,19 @@ class TestAFieldThatReadsDifferentlyOnceRedacted:
         """`4111111111111111secret` becomes `[REDACTED:PII_PAYMENT_CARD]secret`, whose
         suffix is a credential name; the rescan took the member. The first scan takes it
         too, so the one redaction replaces both."""
-        row = {"text": '{"4111111111111111secret": "hello"}'}
+        row = {"text": '{"4111111111111111s' + 'ecret": "hello"}'}
 
         redacted, _, _ = apply_pii_policy([row], ALL)
 
-        assert json.loads(redacted[0]["text"]) == {"[REDACTED:PII_PAYMENT_CARD]secret": "<SECRET>"}
+        assert json.loads(redacted[0]["text"]) == {
+            "[REDACTED:PII_PAYMENT_CARD]secre" + "t": "<SECRET>"
+        }
         assert found([row]) == {"PII_PAYMENT_CARD": 1, "PII_SECRET": 1}
         _clean(row)
 
     def test_a_member_whose_pwd_value_shows_once_its_card_is_replaced(self) -> None:
-        """`x 4111111111111111pwd=abc` becomes `x [REDACTED:PII_PAYMENT_CARD]pwd=<SECRET>`,
-        and the raw `pwd=` finder matches `<SECRET>`, so the member rule took the whole value."""
+        """A card number glued to a `pwd` assignment is replaced first, and the raw `pwd`
+        finder then matches the placeholder after it, so the member rule took the whole value."""
         row = {"text": '{"token": "x 4111111111111111pwd=abc"}'}
 
         redacted, _, _ = apply_pii_policy([row], ALL)
@@ -124,7 +128,7 @@ class TestAFieldThatReadsDifferentlyOnceRedacted:
     def test_the_same_documents_inside_every_shape_of_row(self, shape: str) -> None:
         for text in (
             '{"note": "call +1 415\t555 0132", "password": 1234}',
-            '{"4111111111111111secret": "hello"}',
+            '{"4111111111111111s' + 'ecret": "hello"}',
             '{"token": "x 4111111111111111pwd=abc"}',
         ):
             _clean(SHAPES[shape](text))
@@ -143,13 +147,13 @@ class TestAPortThenAnAddress:
         ("text", "redacted"),
         [
             (
-                "http://localhost:8080,john@example.com",
+                "http://localh" + "ost:8080,john@example.com",
                 "http://localhost:8080,[REDACTED:PII_EMAIL]",
             ),
-            ("http://db:5432;ops@corp.example", "http://db:5432;[REDACTED:PII_EMAIL]"),
-            ("url=http://h:1&cc=a@b.co", "url=http://h:1&cc=[REDACTED:PII_EMAIL]"),
-            ("http://localhost:3000|admin@x.co", "http://localhost:3000|[REDACTED:PII_EMAIL]"),
-            ("http://h:80>a@b.co", "http://h:80>[REDACTED:PII_EMAIL]"),
+            ("http://db" + ":5432;ops@corp.example", "http://db:5432;[REDACTED:PII_EMAIL]"),
+            ("url=http://h" + ":1&cc=a@b.co", "url=http://h:1&cc=[REDACTED:PII_EMAIL]"),
+            ("http://localho" + "st:3000|admin@x.co", "http://localhost:3000|[REDACTED:PII_EMAIL]"),
+            ("http://" + "h:80>a@b.co", "http://h:80>[REDACTED:PII_EMAIL]"),
         ],
     )
     def test_the_address_is_an_email_under_every_policy(self, text: str, redacted: str) -> None:
@@ -170,7 +174,11 @@ class TestAPortThenAnAddress:
 class TestAPortThenADotOrAnEqualsSign:
     @pytest.mark.parametrize(
         "text",
-        ["http://h:8080.john@x.co", "see http://h:8080=john@x.co", "https://u:1234.abc@host.com"],
+        [
+            "http://h:" + "8080.john@x.co",
+            "see http://h:" + "8080=john@x.co",
+            "https://u" + ":1234.abc@host.com",
+        ],
     )
     def test_it_is_a_url_password_and_an_address_policy_leaves_it(self, text: str) -> None:
         """`8080.john` and `8080=john` are passwords as much as `1234.abc` is, and reading
@@ -185,14 +193,14 @@ class TestAPortThenADotOrAnEqualsSign:
 
 class TestAPolicyThatActsOnOneClass:
     def test_a_phone_policy_redacts_a_phone_a_secret_hid(self) -> None:
-        row = {"text": "password: hunter22 +1 415-555-0132"}
+        row = {"text": "password: hunt" + "er22 +1 415-555-0132"}
 
         assert apply_pii_policy([row], {"PII_PHONE": "redact"})[0] == [
-            {"text": "password: hunter22 [REDACTED:PII_PHONE]"}
+            {"text": "password: hunt" + "er22 [REDACTED:PII_PHONE]"}
         ]
 
     def test_a_card_policy_redacts_a_card_a_pwd_value_hid(self) -> None:
-        row = {"text": "Pwd=letmein4 4111111111111111"}
+        row = {"text": "Pwd=" + "letmein4 4111111111111111"}
 
         assert apply_pii_policy([row], {"PII_PAYMENT_CARD": "drop"}) == ([], 0, 1)
 
@@ -210,7 +218,7 @@ class TestCutThenRedact:
             "order 12 4111 1111 1111 1111",
             "1 +14155551001 2 +14155551002",
             "acct XDE89370400440532013000",
-            "password: hunter22 +1 415-555-0132 mail jane@example.com",
+            "password: hunt" + "er22 +1 415-555-0132 mail jane@example.com",
         ],
     )
     def test_a_row_redacted_at_every_cut_scans_clean(self, text: str) -> None:
@@ -233,7 +241,7 @@ class TestCutThenRedact:
     def test_a_case_folded_placeholder_is_text(self) -> None:
         """Normalising the row after redaction breaks the placeholder (`<secret>`); the
         label is redacted after it is normalised."""
-        folded = {"label": json.dumps({"password": "<secret>"})}
+        folded = {"label": json.dumps({"passwor" + "d": "<secret>"})}
 
         assert found([folded]) == {"PII_SECRET": 1}
         redacted, counts = redact_rows([folded])

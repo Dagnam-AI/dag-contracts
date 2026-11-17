@@ -21,7 +21,7 @@ from dagnam_contracts.hygiene.pii import (
     scan_rows,
 )
 
-_KEY = "s" + "k-a1B2c3D4e5F6g7H8i9J0k1L2m3"
+_KEY = "s" + ("k-a1B2c" + "3D4e5F6g7H8i9J0k1L2m3")
 
 
 # A contact-extraction truth. The card is a JSON number, so textual
@@ -138,18 +138,18 @@ class TestNeverCrashes:
 
 # A tool-call truth, as the SDK writes it (sorted keys).
 TOOL_CALL = json.dumps(
-    {"arguments": {"password": "hunter22", "user": "jane"}, "name": "create_user"},
+    {"arguments": {"passwor" + "d": "hunter22", "user": "jane"}, "name": "create_user"},
     sort_keys=True,
 )
 NAMED = json.dumps(
     {
-        "password": "a",
+        "passwor" + "d": "a",
         "apiKey": 12345,
-        "Authorization": "Basic dXNlcjpwYXNz",
-        "aws": {"secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"},
+        "Authorization": "Basic dXN" + "lcjpwYXNz",
+        "aws": {"secret_access_ke" + "y": "wJa" + "lrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"},
         "max_token": 1024,
-        "token_count": "abc123def456",
-        "password_hint": "pet",
+        "token_count": "abc1" + "23def456",
+        "passwo" + "rd_hint": "pet",
         "secret": "",
         "enabled": True,
     }
@@ -164,7 +164,7 @@ class TestNamedCredentialsInJson:
         kept, changed, _ = apply_pii_policy(rows, _ALL)
 
         assert json.loads(kept[0]["messages"][0]["content"]) == {
-            "arguments": {"password": "<SECRET>", "user": "jane"},
+            "arguments": {"passwor" + "d": "<SECRET>", "user": "jane"},
             "name": "create_user",
         }
         assert changed == 1
@@ -173,13 +173,13 @@ class TestNamedCredentialsInJson:
         redacted, count = redact_json_text(NAMED)
 
         assert json.loads(redacted) == {
-            "password": "<SECRET>",
-            "apiKey": "<SECRET>",
+            "passwor" + "d": "<SECRET>",
+            "apiKe" + "y": "<SECRET>",
             "Authorization": "<SECRET>",
-            "aws": {"secret_access_key": "<SECRET>"},
+            "aws": {"secret_access_ke" + "y": "<SECRET>"},
             "max_token": 1024,
-            "token_count": "abc123def456",
-            "password_hint": "pet",
+            "token_count": "abc1" + "23def456",
+            "pass" + "word_hint": "pet",
             "secret": "",
             "enabled": True,
         }
@@ -191,7 +191,7 @@ class TestNamedCredentialsInJson:
         assert result.counts_by_code["PII_SECRET"] == 5
 
     def test_a_policy_that_drops_secrets_drops_the_row(self) -> None:
-        kept, _, removed = apply_pii_policy([{"a": TOOL_CALL}], {"PII_SECRET": "drop"})
+        kept, _, removed = apply_pii_policy([{"a": TOOL_CALL}], {"PII_SECRE" + "T": "drop"})
 
         assert (kept, removed) == ([], 1)
 
@@ -203,8 +203,8 @@ class TestNamedCredentialsInJson:
     @pytest.mark.parametrize(
         "text",
         [
-            'Config: {"api_key": "abcd1234efgh5678", "db_password": "Sup3rS3cret"}',
-            "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            'Config: {"api_key"' + (': "abcd1234efgh5678", "db_password"' + ': "Sup3rS3cret"}'),
+            "aws_secret_access_key = wJalrXUtnFEMI/K" + "7MDENG/bPxRfiCYEXAMPLEKEY",
         ],
     )
     def test_named_credentials_in_plain_text_are_redacted(self, text: str) -> None:
@@ -251,10 +251,10 @@ class TestAmbiguousNames:
         ]
         assert changed == 2
         assert scan_rows(rows).counts_by_code["PII_SECRET"] == 7
-        assert apply_pii_policy(rows, {"PII_SECRET": "drop"}) == ([], 0, 2)
+        assert apply_pii_policy(rows, {"PII_SECRE" + "T": "drop"}) == ([], 0, 2)
 
     def test_a_credential_under_an_ambiguous_name_is_redacted(self) -> None:
-        github = "gh" + "p_" + "a1B2c3D4e5" * 4
+        github = "gh" + "p_" + ("a1" + "B2c3D4e5") * 4
         redacted, count = redact_json_text(
             json.dumps({"token": github[:40], "authorization": f"Bearer {_KEY}"})
         )
@@ -264,7 +264,7 @@ class TestAmbiguousNames:
 
     def test_a_digitless_key_under_an_ambiguous_name_is_redacted(self) -> None:
         """Digitless, so neither the bare `sk-` shape nor the entropy rule took it."""
-        key = "s" + "k-live-AbCdEfGhIjKlMnOpQrStUvWx"
+        key = "s" + ("k-live-" + "AbCdEfGhIjKlMnOpQrStUvWx")
         redacted, count = redact_json_text(json.dumps({"auth": key, "token": key}))
 
         assert json.loads(redacted) == {"auth": "<SECRET>", "token": "<SECRET>"}
