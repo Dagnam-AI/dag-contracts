@@ -32,6 +32,35 @@ _OLD_BARE = re.compile(
     _NAME_START + rf"(?P<n>(?i:{_NAMES}))[\"']?\s*[:=]\s*[\"']?"
     rf"(?P<s>(?={_OLD_BARE_CHAR}*\d){_OLD_BARE_CHAR}{{6,}}|{_OLD_BARE_CHAR}{{16,}})"
 )
+
+
+def bare_walk_before_r1(text: str) -> list[tuple[str, int, int]]:
+    """`cred._bare_assignments` as it was: every value `_OLD_BARE` finds consumes its whole
+    run, one an ambiguous name refuses included, and only then is a name asked whether it
+    vouches. The compiled core (`dagnam-core` 0.1.1) still reads text this way."""
+    return [
+        (match["n"], *match.span("s"))
+        for match in _OLD_BARE.finditer(text)
+        if cred._is_credential(match["n"], text[slice(*match.span("s"))])
+    ]
+
+
+def _credentials_of_the_old_bare(text: str) -> list[tuple[str, int, int]]:
+    """The values `_OLD_BARE` finds that a name vouches for, each name judged on the whole
+    run after it: a value an ambiguous name refuses is passed over by one character, not by
+    the whole run (`test_credentials_refused.py`). Quadratic on purpose; the walk is not."""
+    found: list[tuple[str, int, int]] = []
+    position = 0
+    while (match := _OLD_BARE.search(text, position)) is not None:
+        start, end = match.span("s")
+        if cred._is_credential(match["n"], text[start:end]):
+            found.append((match["n"], start, end))
+            position = end
+        else:
+            position = match.start() + 1
+    return found
+
+
 _OLD_QUOTED = re.compile(
     _NAME_START + rf"(?P<n>(?i:{_NAMES}))[\"']\s*[:=]\s*(?P<q>[\"'])"
     r"(?P<s>(?:(?!(?P=q))[^\n])+)(?P=q)"
@@ -117,8 +146,7 @@ class TestEachWalkIsTheirPatternOnFuzzedText:
 
     def test_a_bare_value_after_a_name(self) -> None:
         for text in _texts(2, 40_000):
-            oracle = [(m["n"], *m.span("s")) for m in _OLD_BARE.finditer(text)]
-            assert cred._bare_assignments(text) == oracle, text
+            assert cred._bare_assignments(text) == _credentials_of_the_old_bare(text), text
 
     def test_a_quoted_value_after_a_name(self) -> None:
         for text in _texts(3, 40_000):

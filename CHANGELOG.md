@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/). Releases
 before 0.4.0 are described in `README.md`.
 
+## [Unreleased]
+
+### Fixed
+
+- **A credential after a value an ambiguous name refuses is found.** `token=<16+
+  letters>?password=...` (also `|`, `#`, `:-`, `:_`, `!` and `@` between them, and `/`, `+`,
+  `.`, `=` when the password has no digit) kept its password: the scan of bare values
+  jumped past the whole refused run, so every name inside it went unread. It now resumes
+  right after the refused name, and each assignment is judged on its own, in time and
+  memory that do not grow with the number of names in the run. A value that vouches for
+  itself is still taken whole. The compiled core (`dagnam-core`) still has the old
+  behaviour until it is updated to this release's reference.
+
 ## [0.6.0] - 2026-11-17
 
 ### Added
@@ -47,7 +60,7 @@ before 0.4.0 are described in `README.md`.
 
 - Near-duplicate detection compares every pair of rows with identical normalised text,
   so its memory grows with the square of the number of identical texts. This holds on
-  both backends.
+  both backends. (Bounded and reduced in the next release, see above.)
 
 ## [0.5.0] - 2026-10-24
 

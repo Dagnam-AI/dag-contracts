@@ -231,6 +231,35 @@ def _assignment_texts() -> set[str]:
     return texts
 
 
+def _refused_run_texts() -> set[str]:
+    """An assignment inside a value an ambiguous name refuses (the R1 shapes).
+
+    The refused value is 20 letters, which no ambiguous name vouches for. What follows
+    it, joined by characters a value may hold, is read on its own: an assignment that
+    takes any value, one that does vouch, a run cut by a colon, a run of names, and the
+    joiners (`/ + . =`) that make the whole run one value when it holds a digit.
+    """
+    first, second, digits = VALUES
+    ambiguous = [n for n in NAMES if _finder._credential_name(n) in _finder._AMBIGUOUS]
+    anything = [n for n in NAMES if _finder._credential_name(n) not in {None, *_finder._AMBIGUOUS}]
+    refused = "Paris" * 4
+    joiners = ["?", "|", ":-", ":_", "#", "!", "@", "/", "+", ".", "=", "&", " "]
+    values = [first, "horse" * 4, second, digits]
+    wrappers = ["{}", "GET /x?{} ok", "export {}", "cfg: {};"]
+    texts: set[str] = set()
+    cells = itertools.product(ambiguous, _SEPARATORS[:3], joiners, anything)
+    for index, (name, separator, joiner, other) in enumerate(cells):
+        text = f"{name}{separator}{refused}{joiner}{other}={values[index % len(values)]}"
+        texts.add(wrappers[index % len(wrappers)].format(text))
+    for name, other in itertools.product(ambiguous, ambiguous):
+        for tail in (second, "short", refused, f"{first}:{anything[0]}={second}"):
+            texts.add(f"{name}={refused}?{other}={tail}")
+        for unit in (f"a.{other}=", f"aa.{other}=:x", f"a-{other}=b:"):
+            texts.add(f"{name}=?" + unit * 6)
+            texts.add(f"{name}=?" + unit * 6 + second)
+    return texts
+
+
 def _url_and_pem_texts(generator: random.Random) -> set[str]:
     texts = {
         f"{scheme}{URL_SEP}{user}@{host}"
@@ -269,6 +298,7 @@ def generated_texts(seed: int) -> set[str]:
     return (
         _provider_texts()
         | _assignment_texts()
+        | _refused_run_texts()
         | _url_and_pem_texts(generator)
         | _jwt_texts(generator)
     )

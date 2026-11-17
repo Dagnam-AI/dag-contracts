@@ -23,6 +23,7 @@ from export_corpus import export
 import pytest
 from test_export_corpus import ALL_NAMES, MARKERS, Corpus, _read
 
+from dagnam_contracts.hygiene import _backend
 from dagnam_contracts.hygiene.spans import findings
 
 # The formats of the finder (hygiene/credentials.py) that a case must pin, and the least
@@ -59,7 +60,11 @@ def _cases(corpus: Corpus) -> list[dict[str, Any]]:
 
 
 def _spans(text: str) -> list[list[Any]]:
-    return [[s, e, d.code] for s, e, d in findings(text)]
+    """What the Python reference reports: the corpus is its answer, whichever backend is
+    active (the compiled core is held to the corpus by its own repository, and to the
+    reference by `test_differential.py`)."""
+    with _backend.reference():
+        return [[s, e, d.code] for s, e, d in findings(text)]
 
 
 def test_every_case_assembles_to_the_text_the_reference_reports_on(corpus: Corpus) -> None:
